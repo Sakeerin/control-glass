@@ -1,6 +1,24 @@
-# 🔬 Control Glass v2.0 (`control-glass`)
+# 🔬 Control Glass v2.1 (`control-glass`)
 
-> **High-Trust Agentic Engineering Plugin & CLI** — เปลี่ยน AI Coding Agent จาก *"สายพานโรงงานที่ผลิตโค้ดขยะ (Slop Factory)"* สู่ **"ครัวมิชลิน (Michelin Kitchen)"** ที่นำทางด้วย `/control-glass-mode` พร้อมเครื่องมือตรวจสอบระดับ AST, SHA-256 TDD Lock, V8 Heap Benchmark และการคัดกรอง Tiered Review อัตโนมัติ
+> **Universal Multi-Vendor Agentic Engineering Plugin, MCP Server & CLI** — รองรับการทำงานกับ AI ทุกค่าย (**Anthropic Claude, OpenAI Codex/GPT, Google Gemini/Antigravity, Cursor, GitHub Copilot, Windsurf & Local Ollama**) เปลี่ยน AI Coding Agent จาก *"สายพานโรงงานที่ผลิตโค้ดขยะ (Slop Factory)"* สู่ **"ครัวมิชลิน (Michelin Kitchen)"** ที่ตรวจสอบด้วยหลักฐานเชิงประจักษ์ 6 ด่าน
+
+---
+
+## 🌐 รองรับ AI ทุกค่ายแบบ Universal (Multi-Vendor AI Support)
+
+ไม่ว่าผู้พัฒนาจะใช้ AI ค่ายไหน `control-glass` สามารถเชื่อมต่อและบังคับใช้มาตรฐานเดียวกันทั้งหมดผ่าน 3 กลไก:
+
+1. **🔄 Multi-Vendor Config & Slash-Command Sync (`npx control-glass sync-vendors`):**
+   * **Claude Code (Anthropic):** สร้าง `CLAUDE.md` และคำสั่ง `.claude/commands/` (`/project:control-glass-mode`, `/project:interrogate`, `/project:deslop`, `/project:arena`)
+   * **OpenAI Codex / Agents:** สร้างและซิงค์ `AGENTS.md`
+   * **Cursor IDE:** สร้าง `.cursor/rules/control-glass.mdc` และ `plugin.json`
+   * **GitHub Copilot:** สร้าง `.github/copilot-instructions.md`
+   * **Windsurf:** สร้าง `.windsurfrules`
+   * **Google Antigravity:** สร้าง `.agent/rules/`, `.agent/skills/` และ `plugin.json`
+2. **🔌 Universal MCP Server (`npx control-glass mcp`):**
+   * เปิดให้ Claude Desktop, Claude Code, OpenAI Agents SDK, Cursor หรือ IDE ใดๆ เรียกใช้ด่านตรวจของ `control-glass` (`control_glass_verify_gates`, `control_glass_deslop`, `control_glass_map_dependencies`, `control_glass_diff_tier`, `control_glass_lock_tests`, `control_glass_bench`) เป็น **Native MCP Tools** ได้ทันที
+3. **🤖 Multi-Vendor LLM Gateway (`src/vendors/llm-gateway.ts`):**
+   * โมดูล Type-safe สำหรับเชื่อมต่อ API ของ **Anthropic (`claude-3-7-sonnet`), OpenAI (`gpt-4o`), Google (`gemini-2.5-pro`), และ OpenAI-Compatible (`Ollama / DeepSeek / OpenRouter`)** เพื่อใช้ทำ Multi-Model `/arena` หรือ Cross-Vendor `/interrogate`
 
 ---
 
@@ -28,6 +46,7 @@
 * 📘 **[01 — Getting Started & Installation](./docs/guide/01-getting-started.md)**: วิธีติดตั้งเป็น Plugin และวิธีติดตั้ง CLI ลงในโปรเจกต์ของคุณ (`npx control-glass init`)
 * 🧭 **[02 — Route Work Through `/control-glass-mode`](./docs/guide/02-control-glass-mode.md)**: วิธีใช้งาน `/control-glass-mode` ร่วมกับ `/arena`, `/interrogate`, `/deslop`, และ `/how-why`
 * 🛡️ **[03 — Dune Architecture & The 6 Verification Gates](./docs/guide/03-dune-and-guardrails.md)**: เจาะลึก Branded Contracts, กฎ AST Linter, SHA-256 TDD Lock และการคัดแยก Tier 0 / Tier 1 / Tier 2
+* 🌐 **[04 — Multi-Vendor AI Support (Claude, OpenAI, Gemini, Cursor, Copilot, MCP)](./docs/guide/04-multi-vendor-ai.md)**: วิธีเชื่อมต่อกับ AI ทุกค่ายและตั้งค่า MCP Server
 
 ---
 
@@ -87,7 +106,10 @@ npx control-glass verify
 
 | คำสั่ง CLI | คำสั่ง npm (ในโปรเจกต์นี้) | คำอธิบาย |
 | :--- | :--- | :--- |
-| `npx control-glass init` | `npm run cli -- init` | สร้าง `feature-map.json`, `AGENTS.md`, และ `.control-glass/tdd-lock.json` ในโปรเจกต์ปลายทาง |
+| `npx control-glass init` | `npm run cli -- init` | สร้าง `feature-map.json`, `AGENTS.md`, ซิงค์ไฟล์ทุก AI Vendor และสร้าง `.control-glass/tdd-lock.json` |
+| `npx control-glass sync-vendors` | `npm run sync:vendors` | สร้างและอัปเดตไฟล์ตั้งค่าสำหรับ Claude (`CLAUDE.md`), OpenAI (`AGENTS.md`), Cursor, Copilot, Windsurf และ MCP |
+| `npx control-glass mcp` | `npm run mcp` | รัน Model Context Protocol (MCP) Server ผ่าน stdio ให้ AI ทุกค่ายเรียกใช้ด่านตรวจเป็น Native Tools |
+| `npx control-glass vendors` | `npm run cli -- vendors` | ตรวจสอบสถานะการตั้งค่า API ของ Anthropic Claude, OpenAI, Gemini และ Local Ollama |
 | `npx control-glass verify` | `npm run verify` | **คำสั่งหลัก:** รันทุกด่านตรวจสอบพร้อมกัน และสร้างไฟล์หลักฐาน `.control-glass/evidence-latest.json` |
 | `npx control-glass map` | `npm run map` | สแกน AST สร้างแผนผัง Dependency & Exports (`.control-glass/dependency-graph.json`) |
 | `npx control-glass deslop [--fix]` | `npm run deslop` | ตรวจจับและกวาดล้าง AI Slop (ลบคอมเมนต์อัตโนมัติ, ดักจับ `catch {}` ว่าง และ `debugger`) |

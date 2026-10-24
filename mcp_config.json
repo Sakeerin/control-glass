@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "control-glass": {
+      "command": "npx",
+      "args": [
+        "control-glass",
+        "mcp"
+      ]
+    }
+  }
+}

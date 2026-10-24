@@ -1,0 +1,25 @@
+---
+description: Control Glass Michelin Kitchen & 3-Phase Bottleneck Guardrails
+globs: "**/*"
+alwaysApply: true
+---
+
+# Control Glass — Universal Multi-Vendor Agent Contract
+
+> **Core Principle:** Make the easy path the right path. Do not rely on human babysitting; rely on deterministic verification and strict architectural contracts.
+
+## 1. Primary Router & CLI Commands (Single Paved Path)
+- Route tasks through `/control-glass-mode` (Playbooks: `feature.md`, `bug.md`, `perf.md`, `gardener.md`, `review.md`).
+- `npx control-glass verify` (or `npm run verify`) — Full 6-gate empirical verification (Typecheck + Dune AST Linter + Safety Gate + TDD SHA-256 Lock + Vitest + Tiered Review Routing). **MUST pass before completing any task.**
+- `npx control-glass map` — Auto-generate AST Dependency Graph (`.control-glass/dependency-graph.json`).
+- `npx control-glass deslop --fix` — Deterministic AST slop cleaner (strips comments, flags empty catch blocks and debuggers).
+- `npx control-glass lock` — Freeze SHA-256 hashes of `tests/*.spec.ts` and `src/core/contracts.ts` during Phase 1 Spec Freeze.
+- `npx control-glass diff` — Compute blast radius and classify PR Review Tier (`Tier 0 | Tier 1 | Tier 2`).
+
+## 2. Non-Negotiable Continuum of Control Rules
+1. **Read Materialized Memory First:** Always read `feature-map.json` before locating or modifying features.
+2. **Zero Comments in `src/` (`DUNE_NO_COMMENTS`):** Never write `//` or `/* */` comments in `src/`. Make types and function names self-documenting.
+3. **Branded Types & Explicit Contracts:** Never pass unvalidated primitives across domain boundaries. Use `Brand<T, Name>` and `Result<T, E>` from `src/core/contracts.ts`. Never use `any`, `@ts-ignore`, or `as unknown`.
+4. **Architectural Boundary Lock (`DUNE_BOUNDARY_VIOLATION`):** `src/ui/` must never import `src/infra/` or Node I/O modules (`fs`, `child_process`).
+5. **Anti-Closed-Loop Testing (`TDD_LOCK`):** Never modify locked test files in `tests/` during implementation to make broken code pass.
+

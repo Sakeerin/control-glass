@@ -62,6 +62,21 @@
       "tests": ["tests/canary-gate.spec.ts"],
       "domOrUiSelectors": ["#canary-rollout-stepper"],
       "verificationCommand": "npm run verify"
+    },
+    {
+      "id": "multi-vendor-ai-gateway",
+      "name": "Universal Multi-Vendor AI Adapter & MCP Server",
+      "tier": "Tier 1",
+      "riskReason": "Bridges Control Glass across Anthropic Claude, OpenAI Codex/GPT, Google Gemini, Cursor, Copilot, Windsurf, and MCP clients.",
+      "entrypoints": [
+        "src/vendors/llm-gateway.ts",
+        "src/harness/vendor-sync.ts",
+        "src/harness/mcp-server.ts"
+      ],
+      "contracts": ["src/core/contracts.ts"],
+      "tests": ["tests/multi-vendor.spec.ts"],
+      "domOrUiSelectors": [],
+      "verificationCommand": "npm run verify"
     }
   ]
 }

@@ -49,4 +49,24 @@ export {
   type BenchmarkSuiteReport
 } from "./harness/bench.js";
 export { installGitAndCiHooks } from "./harness/hook-installer.js";
+export {
+  syncVendorConfigs,
+  type SupportedVendorTarget,
+  type VendorSyncReport
+} from "./harness/vendor-sync.js";
+export {
+  CONTROL_GLASS_MCP_TOOLS,
+  handleMcpRequest,
+  startMcpStdioServer,
+  type JsonRpcRequest,
+  type JsonRpcResponse
+} from "./harness/mcp-server.js";
+export {
+  type AiVendorId,
+  type VendorModelConfig,
+  type VendorRequestPayload,
+  createVendorModelConfig,
+  buildVendorRequestPayload,
+  detectAvailableVendors
+} from "./vendors/llm-gateway.js";
 export { initControlGlassProject } from "./harness/cli.js";

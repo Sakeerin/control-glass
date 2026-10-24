@@ -4,7 +4,7 @@ import ts from "typescript";
 
 export interface FileDependencyNode {
   readonly file: string;
-  readonly layer: "core" | "features" | "ui" | "harness" | "other";
+  readonly layer: "core" | "features" | "ui" | "harness" | "vendors" | "other";
   readonly imports: readonly string[];
   readonly importedBy: readonly string[];
   readonly exportedSymbols: readonly string[];
@@ -38,6 +38,7 @@ function classifyLayer(relPath: string): FileDependencyNode["layer"] {
   if (relPath.startsWith("src/features/")) return "features";
   if (relPath.startsWith("src/ui/")) return "ui";
   if (relPath.startsWith("src/harness/")) return "harness";
+  if (relPath.startsWith("src/vendors/")) return "vendors";
   return "other";
 }
 

@@ -1,7 +1,7 @@
 {
   "name": "control-glass",
-  "version": "2.0.0",
-  "description": "High-Trust Agentic Engineering Plugin & CLI (Outperforming pstack with executable AST Deslop, Auto-Mapper, SHA-256 TDD Locks, Heap Benchmarks, and Tiered Review)",
+  "version": "2.1.0",
+  "description": "Universal Multi-Vendor Agentic Engineering Plugin, MCP Server & CLI (Claude, OpenAI Codex/GPT, Gemini, Cursor, Copilot, Windsurf)",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
@@ -22,7 +22,9 @@
     "docs",
     "assets",
     "plugin.json",
+    "mcp_config.json",
     "AGENTS.md",
+    "CLAUDE.md",
     "README.md"
   ],
   "scripts": {
@@ -32,6 +34,8 @@
     "deslop": "tsx src/harness/deslop.ts",
     "map": "tsx src/harness/auto-mapper.ts",
     "bench": "tsx src/harness/bench.ts",
+    "sync:vendors": "tsx src/harness/vendor-sync.ts",
+    "mcp": "tsx src/harness/mcp-server.ts",
     "install:hooks": "tsx src/harness/hook-installer.ts",
     "guard:safety": "tsx src/harness/safety-gate.ts",
     "guard:tdd": "tsx src/harness/tdd-guard.ts",

@@ -1,6 +1,11 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import {
+  buildVendorRequestPayload,
+  createVendorModelConfig,
+  detectAvailableVendors
+} from "../vendors/llm-gateway.js";
 import { buildDependencyGraph } from "./auto-mapper.js";
 import { runPerformanceBenchmark } from "./bench.js";
 import { runControlGlass } from "./control-glass.js";
@@ -8,8 +13,10 @@ import { runDeslopEngine } from "./deslop.js";
 import { analyzeDiffAndTier } from "./diff-reviewer.js";
 import { runDuneLinter } from "./dune-linter.js";
 import { installGitAndCiHooks } from "./hook-installer.js";
+import { startMcpStdioServer } from "./mcp-server.js";
 import { runSafetyGate } from "./safety-gate.js";
 import { verifyTddLock, writeTddLockManifest } from "./tdd-guard.js";
+import { syncVendorConfigs } from "./vendor-sync.js";
 
 const DEFAULT_FEATURE_MAP = {
   schemaVersion: "1.0.0",
@@ -47,6 +54,8 @@ const DEFAULT_AGENTS_MD = `# AGENTS.md — Control Glass (Michelin Kitchen & Bot
 - \`npx control-glass safety\` — Scans for leaked secrets and destructive operations.
 - \`npx control-glass lock\` — Locks SHA-256 hashes of tests and contracts during Phase 1 Spec Freeze.
 - \`npx control-glass diff\` — Generates Diff & Consequence Report and calculates Review Tier (\`Tier 0 | 1 | 2\`).
+- \`npx control-glass sync-vendors\` — Generates instructions & slash commands for Claude, OpenAI Codex, Cursor, Copilot, Windsurf, and MCP.
+- \`npx control-glass mcp\` — Starts the Universal Model Context Protocol (MCP) Server over stdio.
 - \`npx control-glass install-hooks\` — Installs Git pre-commit hook and GitHub Actions CI workflow.
 
 ## 2. Continuum of Control (Non-Negotiable Rules)
@@ -73,6 +82,9 @@ export function initControlGlassProject(targetDir: string = process.cwd()): {
     created.push("AGENTS.md");
   }
 
+  const vendorReport = syncVendorConfigs(targetDir);
+  created.push(...vendorReport.generatedFiles);
+
   writeTddLockManifest(targetDir);
   created.push(".control-glass/tdd-lock.json");
 
@@ -81,13 +93,16 @@ export function initControlGlassProject(targetDir: string = process.cwd()): {
 
 function printHelp(): void {
   console.log(`
-🔬 Control Glass CLI v2.0 — High-Trust Agentic Engineering Harness
+🔬 Control Glass CLI v2.1 — Universal Multi-Vendor Agentic Engineering Harness
 
 Usage:
   control-glass <command> [options]
 
 Commands:
-  init            Initialize Control Glass in any repository (feature-map.json, AGENTS.md, TDD lock)
+  init            Initialize Control Glass & multi-vendor configs in any repository
+  sync-vendors    Generate instruction files & slash commands for Claude, OpenAI, Cursor, Copilot, Windsurf & MCP
+  mcp             Start the Control Glass MCP (Model Context Protocol) stdio server for any AI client
+  vendors         Inspect supported AI vendor adapters (Anthropic Claude, OpenAI, Gemini, Ollama/OpenRouter)
   verify          Run full 6-gate empirical verification pipeline & emit .control-glass/evidence-latest.json
   lint            Run Dune AST Linter (No-Comment, Boundary Lock, No-Any, No-Console)
   deslop [--fix]  Detect & strip AI slop (comments, empty catch blocks, leftover debuggers)
@@ -108,7 +123,35 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
   switch (cmd) {
     case "init": {
       const res = initControlGlassProject(cwd);
-      console.log(`✅ Control Glass initialized: ${res.createdFiles.join(", ")}`);
+      console.log(`✅ Control Glass initialized (${res.createdFiles.length} files configured).`);
+      break;
+    }
+    case "sync-vendors": {
+      const report = syncVendorConfigs(cwd);
+      console.log(
+        `🌐 Synced Multi-Vendor AI configs (${report.syncedTargets.join(", ")}):\n  - ${report.generatedFiles.join("\n  - ")}`
+      );
+      break;
+    }
+    case "mcp": {
+      startMcpStdioServer(cwd);
+      break;
+    }
+    case "vendors": {
+      const active = detectAvailableVendors();
+      const claudeCfg = createVendorModelConfig("anthropic");
+      const openaiCfg = createVendorModelConfig("openai");
+      const geminiCfg = createVendorModelConfig("gemini");
+      const localCfg = createVendorModelConfig("openai-compatible");
+      console.log("🤖 Control Glass Multi-Vendor LLM Gateway:");
+      console.log("  Supported Providers: anthropic (Claude), openai (GPT/o-series), gemini, openai-compatible (Ollama/DeepSeek/OpenRouter)");
+      console.log(`  Detected Active API Keys in Env: ${active.length > 0 ? active.join(", ") : "None (Set ANTHROPIC_API_KEY, OPENAI_API_KEY, or GEMINI_API_KEY)"}`);
+      if (claudeCfg.ok && openaiCfg.ok && geminiCfg.ok && localCfg.ok) {
+        console.log(
+          `  Default Models: Claude=${claudeCfg.value.modelId}, OpenAI=${openaiCfg.value.modelId}, Gemini=${geminiCfg.value.modelId}, Local=${localCfg.value.modelId}`
+        );
+      }
+      void buildVendorRequestPayload;
       break;
     }
     case "verify": {
