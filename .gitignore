@@ -1,6 +1,8 @@
 node_modules/
 dist/
 .control-glass/evidence-latest.json
+.control-glass/dependency-graph.json
+.control-glass/bench-latest.json
 *.log
 .env
 .env.*

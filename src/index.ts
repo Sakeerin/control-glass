@@ -33,4 +33,20 @@ export {
   runControlGlass,
   type EmpiricalEvidenceArtifact
 } from "./harness/control-glass.js";
+export {
+  buildDependencyGraph,
+  type DependencyGraphArtifact,
+  type FileDependencyNode
+} from "./harness/auto-mapper.js";
+export {
+  runDeslopEngine,
+  type DeslopReport,
+  type SlopIssue
+} from "./harness/deslop.js";
+export {
+  runPerformanceBenchmark,
+  type BenchmarkMetric,
+  type BenchmarkSuiteReport
+} from "./harness/bench.js";
+export { installGitAndCiHooks } from "./harness/hook-installer.js";
 export { initControlGlassProject } from "./harness/cli.js";

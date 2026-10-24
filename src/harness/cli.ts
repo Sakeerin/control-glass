@@ -1,11 +1,15 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { buildDependencyGraph } from "./auto-mapper.js";
+import { runPerformanceBenchmark } from "./bench.js";
+import { runControlGlass } from "./control-glass.js";
+import { runDeslopEngine } from "./deslop.js";
 import { analyzeDiffAndTier } from "./diff-reviewer.js";
 import { runDuneLinter } from "./dune-linter.js";
+import { installGitAndCiHooks } from "./hook-installer.js";
 import { runSafetyGate } from "./safety-gate.js";
 import { verifyTddLock, writeTddLockManifest } from "./tdd-guard.js";
-import { runControlGlass } from "./control-glass.js";
 
 const DEFAULT_FEATURE_MAP = {
   schemaVersion: "1.0.0",
@@ -37,9 +41,13 @@ const DEFAULT_AGENTS_MD = `# AGENTS.md — Control Glass (Michelin Kitchen & Bot
 ## 1. Allowed Commands (Single Paved Path)
 - \`npx control-glass verify\` — Full verification gate (Typecheck + Dune AST Linter + Safety/Secret Gate + TDD Lock Check + Tests + Tiered Risk Classification).
 - \`npx control-glass lint\` — Custom AST static analysis (no-comments, boundary locks, no-any).
+- \`npx control-glass deslop\` — AST Slop detector and comment cleaner (\`--fix\`).
+- \`npx control-glass map\` — Auto-build AST dependency graph (\`.control-glass/dependency-graph.json\`).
+- \`npx control-glass bench\` — Run runtime & V8 heap delta benchmarks (\`.control-glass/bench-latest.json\`).
 - \`npx control-glass safety\` — Scans for leaked secrets and destructive operations.
 - \`npx control-glass lock\` — Locks SHA-256 hashes of tests and contracts during Phase 1 Spec Freeze.
 - \`npx control-glass diff\` — Generates Diff & Consequence Report and calculates Review Tier (\`Tier 0 | 1 | 2\`).
+- \`npx control-glass install-hooks\` — Installs Git pre-commit hook and GitHub Actions CI workflow.
 
 ## 2. Continuum of Control (Non-Negotiable Rules)
 1. **Read Materialized Memory First:** Always read \`feature-map.json\` before locating or modifying features.
@@ -73,19 +81,23 @@ export function initControlGlassProject(targetDir: string = process.cwd()): {
 
 function printHelp(): void {
   console.log(`
-🔬 Control Glass CLI — High-Trust Agentic Engineering Harness
+🔬 Control Glass CLI v2.0 — High-Trust Agentic Engineering Harness
 
 Usage:
-  control-glass <command>
+  control-glass <command> [options]
 
 Commands:
-  init       Initialize Control Glass in any repository (creates feature-map.json, AGENTS.md, and TDD lock)
-  verify     Run full 6-gate empirical verification pipeline & emit .control-glass/evidence-latest.json
-  lint       Run Dune AST Linter (No-Comment, Boundary Lock, No-Any, No-Console)
-  safety     Run Phase 2 Safety & Secret Gate (API key leak & destructive command blocker)
-  tdd-check  Verify Phase 1 TDD & Contract SHA-256 immutability lock
-  lock       Update Phase 1 TDD & Contract SHA-256 lock (.control-glass/tdd-lock.json)
-  diff       Run Phase 3 Diff & Consequence Analyzer and calculate Review Tier (Tier 0 / 1 / 2)
+  init            Initialize Control Glass in any repository (feature-map.json, AGENTS.md, TDD lock)
+  verify          Run full 6-gate empirical verification pipeline & emit .control-glass/evidence-latest.json
+  lint            Run Dune AST Linter (No-Comment, Boundary Lock, No-Any, No-Console)
+  deslop [--fix]  Detect & strip AI slop (comments, empty catch blocks, leftover debuggers)
+  map             Auto-generate AST Dependency & Export Graph (.control-glass/dependency-graph.json)
+  bench           Run empirical performance & V8 heap memory hill-climbing benchmark
+  safety          Run Phase 2 Safety & Secret Gate (API key leak & destructive command blocker)
+  tdd-check       Verify Phase 1 TDD & Contract SHA-256 immutability lock
+  lock            Update Phase 1 TDD & Contract SHA-256 lock (.control-glass/tdd-lock.json)
+  diff            Run Phase 3 Diff & Consequence Analyzer and calculate Review Tier (Tier 0 / 1 / 2)
+  install-hooks   Install zero-bypass Git pre-commit hook and GitHub Actions CI workflow
 `);
 }
 
@@ -112,6 +124,38 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
         process.exit(1);
       }
       console.log(`✅ Dune AST Linter passed (${res.checkedFiles} files verified).`);
+      break;
+    }
+    case "deslop": {
+      const fix = process.argv.includes("--fix");
+      const res = runDeslopEngine(cwd, fix);
+      if (res.cleanedCommentCount > 0) {
+        console.log(`🧹 Auto-cleaned ${res.cleanedCommentCount} comment block(s).`);
+      }
+      if (!res.passed) {
+        for (const issue of res.issues) {
+          console.error(`  [${issue.kind}] ${issue.file}:${issue.line} — ${issue.description}`);
+        }
+        process.exit(1);
+      }
+      console.log(`✅ Deslop Engine passed (${res.scannedFiles} files verified clean).`);
+      break;
+    }
+    case "map": {
+      const graph = buildDependencyGraph(cwd);
+      console.log(`🗺️  Auto-Mapper built AST dependency graph (${graph.totalFiles} files -> .control-glass/dependency-graph.json).`);
+      break;
+    }
+    case "bench": {
+      const report = runPerformanceBenchmark(cwd);
+      for (const m of report.metrics) {
+        console.log(
+          `  - ${m.name}: ${m.totalDurationMs}ms (${m.opsPerSecond.toLocaleString()} ops/sec, heapΔ: ${(m.heapDeltaBytes / 1024).toFixed(1)} KB)`
+        );
+      }
+      if (!report.overallPassed) {
+        process.exit(1);
+      }
       break;
     }
     case "safety": {
@@ -145,6 +189,11 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
       const report = analyzeDiffAndTier(cwd);
       console.log(`🎯 Recommended Tier: ${report.recommendedTier}`);
       console.log(`🚦 Decision: ${report.routingDecision}`);
+      break;
+    }
+    case "install-hooks": {
+      const res = installGitAndCiHooks(cwd);
+      console.log(`🔒 Installed Zero-Bypass Hooks & CI Gates: ${res.installedPaths.join(", ")}`);
       break;
     }
     default: {
