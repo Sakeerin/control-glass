@@ -19,11 +19,13 @@ export function err<E extends string>(error: E): Result<never, E> {
 export type NewtonSeconds = Brand<number, "NewtonSeconds">;
 export type PoundForceSeconds = Brand<number, "PoundForceSeconds">;
 export type Satang = Brand<number, "Satang">;
+export type PercentageInt = Brand<number, "PercentageInt">;
 export type NonEmptyText = Brand<string, "NonEmptyText">;
 export type IdempotencyKey = Brand<string, "IdempotencyKey">;
 
 const FinitePositiveNumberSchema = z.number().finite().nonnegative();
 const SafeIntegerSchema = z.number().int().safe();
+const PercentageIntSchema = z.number().int().min(1).max(100);
 const NonEmptyTextSchema = z.string().trim().min(1);
 
 export function createNewtonSeconds(raw: number): Result<NewtonSeconds, "INVALID_NEWTON_SECONDS"> {
@@ -50,6 +52,16 @@ export function createSatang(raw: number): Result<Satang, "INVALID_SATANG_INTEGE
     return err("INVALID_SATANG_INTEGER");
   }
   return ok(parsed.data as Satang);
+}
+
+export function createPercentageInt(
+  raw: number
+): Result<PercentageInt, "INVALID_PERCENTAGE_BOUNDS"> {
+  const parsed = PercentageIntSchema.safeParse(raw);
+  if (!parsed.success) {
+    return err("INVALID_PERCENTAGE_BOUNDS");
+  }
+  return ok(parsed.data as PercentageInt);
 }
 
 export function createNonEmptyText(raw: string): Result<NonEmptyText, "EMPTY_TEXT_FORBIDDEN"> {

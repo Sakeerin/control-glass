@@ -17,7 +17,7 @@ interface PatternRule {
 const SAFETY_PATTERNS: readonly PatternRule[] = [
   {
     category: "SECRET_LEAK",
-    regex: /\b(sk-[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{30,}|AKIA[0-9A-Z]{16})\b/,
+    regex: /\b(sk-(?:proj-)?[a-zA-Z0-9]{20,}|ghp_[a-zA-Z0-9]{30,}|AKIA[0-9A-Z]{16})\b/,
     detail: "Hardcoded API key or cloud credential detected."
   },
   {

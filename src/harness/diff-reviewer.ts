@@ -38,15 +38,14 @@ const TIER_WEIGHT: Record<ReviewTier, number> = {
 
 function getChangedFilesFromGit(rootDir: string): string[] {
   try {
-    const statusOut = execSync("git status --porcelain", {
+    const statusOut = execSync("git status --porcelain -uall", {
       cwd: rootDir,
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     });
     const lines = statusOut
       .split(/\r?\n/)
-      .map((l) => l.trim())
-      .filter((l) => l.length > 0);
+      .filter((l) => l.trim().length > 0);
     return lines.map((line) => line.slice(3).trim().replace(/\\/g, "/"));
   } catch {
     return [];

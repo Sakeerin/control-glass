@@ -4,3 +4,5 @@ export function renderTelemetryBadgeHtml(viewModel: TelemetryReadoutViewModel): 
   const formattedImpulse = viewModel.totalImpulseNs.toFixed(2);
   return `<section id="telemetry-view-root"><span class="status-badge" data-status="${viewModel.status}">${viewModel.missionName}</span><output data-testid="impulse-ns-readout">${formattedImpulse} N·s</output></section>`;
 }
+
+

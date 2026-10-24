@@ -51,6 +51,17 @@
       "tests": ["tests/telemetry-view.spec.ts"],
       "domOrUiSelectors": ["#telemetry-view-root", ".status-badge"],
       "verificationCommand": "npm run verify"
+    },
+    {
+      "id": "canary-rollout-orchestrator",
+      "name": "Canary Progressive Rollout Gate (CrowdStrike Safeguard)",
+      "tier": "Tier 1",
+      "riskReason": "Enforces staged deployment transitions (1% -> 10% -> 100%) and error-free promotion.",
+      "entrypoints": ["src/features/rollout/canary-gate.ts"],
+      "contracts": ["src/core/contracts.ts"],
+      "tests": ["tests/canary-gate.spec.ts"],
+      "domOrUiSelectors": ["#canary-rollout-stepper"],
+      "verificationCommand": "npm run verify"
     }
   ]
 }
