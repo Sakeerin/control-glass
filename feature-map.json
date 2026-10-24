@@ -1,0 +1,56 @@
+{
+  "schemaVersion": "1.0.0",
+  "description": "Materialized Memory (Feature Map) for Control Glass & Tiered Review Routing",
+  "architecturalBoundaries": {
+    "ui": {
+      "pathPrefix": "src/ui/",
+      "forbiddenImports": ["src/infra/", "node:fs", "node:child_process", "fs", "child_process"],
+      "description": "Renderer / Presentation layer (must maintain 60-120 FPS, zero blocking I/O)"
+    },
+    "features": {
+      "pathPrefix": "src/features/",
+      "forbiddenImports": ["node:child_process", "child_process"],
+      "description": "Single Paved Path domain features using pure Branded Contracts"
+    },
+    "core": {
+      "pathPrefix": "src/core/",
+      "forbiddenImports": ["src/ui/", "src/features/"],
+      "description": "Foundational Branded Types, Result monads, and interface contracts"
+    }
+  },
+  "features": [
+    {
+      "id": "orbital-thruster-telemetry",
+      "name": "Orbital Thruster Impulse Calculator (Mars Orbiter Safeguard)",
+      "tier": "Tier 2",
+      "riskReason": "Mission-critical physics calculation; unit mismatch causes catastrophic trajectory loss.",
+      "entrypoints": ["src/features/thruster/impulse-calculator.ts"],
+      "contracts": ["src/core/contracts.ts"],
+      "tests": ["tests/impulse-calculator.spec.ts"],
+      "domOrUiSelectors": ["#thruster-telemetry-panel", "[data-testid='impulse-ns-readout']"],
+      "verificationCommand": "npm run verify"
+    },
+    {
+      "id": "payment-settlement-ledger",
+      "name": "Precision Financial Ledger (Knight Capital Safeguard)",
+      "tier": "Tier 2",
+      "riskReason": "Financial ledger state mutation; requires integer minor units (Satang) and strict idempotency.",
+      "entrypoints": ["src/features/ledger/settlement.ts"],
+      "contracts": ["src/core/contracts.ts"],
+      "tests": ["tests/settlement.spec.ts"],
+      "domOrUiSelectors": ["#ledger-summary-card", "[data-testid='balance-satang']"],
+      "verificationCommand": "npm run verify"
+    },
+    {
+      "id": "telemetry-dashboard-view",
+      "name": "Telemetry UI Formatter (Renderer Safe)",
+      "tier": "Tier 0",
+      "riskReason": "Pure UI formatting over validated read-only view models; safe for automated merge if all gates pass.",
+      "entrypoints": ["src/ui/telemetry-view.ts"],
+      "contracts": ["src/core/contracts.ts"],
+      "tests": ["tests/telemetry-view.spec.ts"],
+      "domOrUiSelectors": ["#telemetry-view-root", ".status-badge"],
+      "verificationCommand": "npm run verify"
+    }
+  ]
+}

@@ -1,0 +1,10 @@
+{
+  "updatedAt": "2026-10-24T00:12:31.621Z",
+  "files": {
+    "tests/harness-guardrails.spec.ts": "2e9849fdc7436d299c749483785b83fd5b9dfef5202000635c21208f85a35bcd",
+    "tests/impulse-calculator.spec.ts": "9c64e8bfa484a9c38f840c045ed8ee1f86ae67c79b3c7c16a7b994a63a28a7db",
+    "tests/settlement.spec.ts": "684cb15c58fb94e2ac67c7b094648208cc34ce9b1c44182ac25d1319104cbf84",
+    "tests/telemetry-view.spec.ts": "a46d28449a30dc06d06f9c4f869e57224a97c6c6578c93a36c91e725823c12ad",
+    "src/core/contracts.ts": "d6807090950ed8762a2f21730e21bf4b7cdb28eeafa5ddfe187df576b2fab6f1"
+  }
+}

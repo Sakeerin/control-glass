@@ -1,0 +1,201 @@
+import fs from "node:fs";
+import path from "node:path";
+import ts from "typescript";
+
+export interface LintViolation {
+  readonly file: string;
+  readonly line: number;
+  readonly ruleId:
+    | "DUNE_NO_COMMENTS"
+    | "DUNE_BOUNDARY_VIOLATION"
+    | "DUNE_NO_EXPLICIT_ANY"
+    | "DUNE_NO_TYPE_ASSERTION_ESCAPE"
+    | "DUNE_NO_CONSOLE_IN_DOMAIN";
+  readonly message: string;
+}
+
+interface BoundaryConfig {
+  readonly pathPrefix: string;
+  readonly forbiddenImports: readonly string[];
+  readonly description: string;
+}
+
+interface FeatureMapSchema {
+  readonly architecturalBoundaries: Record<string, BoundaryConfig>;
+}
+
+function collectTypeScriptFiles(dirPath: string): string[] {
+  if (!fs.existsSync(dirPath)) {
+    return [];
+  }
+  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
+  const files: string[] = [];
+  for (const entry of entries) {
+    const fullPath = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      files.push(...collectTypeScriptFiles(fullPath));
+    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
+      files.push(fullPath);
+    }
+  }
+  return files;
+}
+
+function getLineNumber(sourceFile: ts.SourceFile, pos: number): number {
+  return sourceFile.getLineAndCharacterOfPosition(pos).line + 1;
+}
+
+function checkNoComments(sourceFile: ts.SourceFile, relativePath: string): LintViolation[] {
+  const violations: LintViolation[] = [];
+  const text = sourceFile.getFullText();
+  const scanner = ts.createScanner(
+    ts.ScriptTarget.Latest,
+    false,
+    ts.LanguageVariant.Standard,
+    text
+  );
+
+  let token = scanner.scan();
+  while (token !== ts.SyntaxKind.EndOfFileToken) {
+    if (
+      token === ts.SyntaxKind.SingleLineCommentTrivia ||
+      token === ts.SyntaxKind.MultiLineCommentTrivia
+    ) {
+      const startPos = scanner.getTokenPos();
+      violations.push({
+        file: relativePath,
+        line: getLineNumber(sourceFile, startPos),
+        ruleId: "DUNE_NO_COMMENTS",
+        message:
+          "Comments are strictly prohibited in Dune codebase. Do not leave band-aid explanations; use expressive types and function names."
+      });
+    }
+    token = scanner.scan();
+  }
+  return violations;
+}
+
+function resolveRelativeImportTarget(importerRelativePath: string, moduleSpecifier: string): string {
+  if (!moduleSpecifier.startsWith(".")) {
+    return moduleSpecifier;
+  }
+  const importerDir = path.posix.dirname(importerRelativePath);
+  return path.posix.normalize(path.posix.join(importerDir, moduleSpecifier));
+}
+
+function checkAstRules(
+  sourceFile: ts.SourceFile,
+  relativePath: string,
+  boundaries: Record<string, BoundaryConfig>
+): LintViolation[] {
+  const violations: LintViolation[] = [];
+  const isHarnessFile = relativePath.startsWith("src/harness/");
+
+  function visit(node: ts.Node): void {
+    if (node.kind === ts.SyntaxKind.AnyKeyword) {
+      violations.push({
+        file: relativePath,
+        line: getLineNumber(sourceFile, node.getStart(sourceFile)),
+        ruleId: "DUNE_NO_EXPLICIT_ANY",
+        message: "Usage of 'any' breaks Level 1 Contract guarantees. Use Branded Types or unknown with Zod."
+      });
+    }
+
+    if (ts.isAsExpression(node)) {
+      const typeText = node.type.getText(sourceFile);
+      if (typeText === "any" || typeText === "unknown") {
+        violations.push({
+          file: relativePath,
+          line: getLineNumber(sourceFile, node.getStart(sourceFile)),
+          ruleId: "DUNE_NO_TYPE_ASSERTION_ESCAPE",
+          message: `Type assertion 'as ${typeText}' is prohibited outside validated brand constructors.`
+        });
+      }
+    }
+
+    if (
+      !isHarnessFile &&
+      ts.isCallExpression(node) &&
+      ts.isPropertyAccessExpression(node.expression) &&
+      node.expression.expression.getText(sourceFile) === "console"
+    ) {
+      violations.push({
+        file: relativePath,
+        line: getLineNumber(sourceFile, node.getStart(sourceFile)),
+        ruleId: "DUNE_NO_CONSOLE_IN_DOMAIN",
+        message: "Direct console output is forbidden in domain/UI layers. Return structured Result values."
+      });
+    }
+
+    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
+      const rawSpec = node.moduleSpecifier.text;
+      const resolvedTarget = resolveRelativeImportTarget(relativePath, rawSpec);
+
+      for (const boundary of Object.values(boundaries)) {
+        if (relativePath.startsWith(boundary.pathPrefix)) {
+          for (const forbidden of boundary.forbiddenImports) {
+            if (rawSpec === forbidden || resolvedTarget.startsWith(forbidden)) {
+              violations.push({
+                file: relativePath,
+                line: getLineNumber(sourceFile, node.getStart(sourceFile)),
+                ruleId: "DUNE_BOUNDARY_VIOLATION",
+                message: `Boundary lock violated: '${relativePath}' (${boundary.pathPrefix}) cannot import '${rawSpec}' (matches forbidden '${forbidden}').`
+              });
+            }
+          }
+        }
+      }
+    }
+
+    ts.forEachChild(node, visit);
+  }
+
+  visit(sourceFile);
+  return violations;
+}
+
+export function runDuneLinter(rootDir: string = process.cwd()): {
+  readonly passed: boolean;
+  readonly checkedFiles: number;
+  readonly violations: readonly LintViolation[];
+} {
+  const featureMapPath = path.join(rootDir, "feature-map.json");
+  const featureMap = JSON.parse(fs.readFileSync(featureMapPath, "utf8")) as FeatureMapSchema;
+  const srcFiles = collectTypeScriptFiles(path.join(rootDir, "src"));
+  const violations: LintViolation[] = [];
+
+  for (const filePath of srcFiles) {
+    const relativePath = path.relative(rootDir, filePath).split(path.sep).join("/");
+    const content = fs.readFileSync(filePath, "utf8");
+    const sourceFile = ts.createSourceFile(
+      relativePath,
+      content,
+      ts.ScriptTarget.Latest,
+      true,
+      ts.ScriptKind.TS
+    );
+
+    violations.push(...checkNoComments(sourceFile, relativePath));
+    violations.push(
+      ...checkAstRules(sourceFile, relativePath, featureMap.architecturalBoundaries)
+    );
+  }
+
+  return {
+    passed: violations.length === 0,
+    checkedFiles: srcFiles.length,
+    violations
+  };
+}
+
+if (import.meta.url === `file://${path.resolve(process.argv[1] ?? "").replace(/\\/g, "/")}` || process.argv[1]?.endsWith("dune-linter.ts")) {
+  const result = runDuneLinter();
+  if (!result.passed) {
+    console.error(`❌ Dune AST Linter failed with ${result.violations.length} violation(s):`);
+    for (const v of result.violations) {
+      console.error(`  [${v.ruleId}] ${v.file}:${v.line} — ${v.message}`);
+    }
+    process.exit(1);
+  }
+  console.log(`✅ Dune AST Linter passed (${result.checkedFiles} files verified, 0 violations).`);
+}
