@@ -1,6 +1,25 @@
 # 🔬 Control Glass (`control-glass`)
 
-> **High-Trust Agentic Engineering Harness** — เปลี่ยนกระบวนการทำงานร่วมกับ AI Agent จาก *"สายพานโรงงานที่ผลิตโค้ดขยะ (Slop Factory)"* สู่ **"ครัวมิชลิน (Michelin Kitchen)"** ที่ตรวจสอบได้ด้วยหลักฐานเชิงประจักษ์ และทลายคอขวดการตรวจโค้ด (Code Review Bottleneck) อย่างเป็นระบบ
+> **High-Trust Agentic Engineering Plugin & CLI** — เปลี่ยน AI Coding Agent จาก *"สายพานโรงงานที่ผลิตโค้ดขยะ (Slop Factory)"* สู่ **"ครัวมิชลิน (Michelin Kitchen)"** ที่นำทางด้วย `/control-glass-mode` (สไตล์ `pstack` `/poteto-mode`), ตรวจสอบด้วยหลักฐานเชิงประจักษ์ 6 ด่าน และทลายคอขวดการตรวจโค้ด (Code Review Bottleneck) อย่างเป็นระบบ
+
+---
+
+## 🌟 2 รูปแบบการนำไปใช้งาน (Dual Distribution)
+
+โปรเจกต์นี้ออกแบบมาให้ผู้พัฒนาคนอื่นๆ นำไปติดตั้งในโปรเจกต์ของตัวเองได้ทันทีทั้ง 2 รูปแบบ:
+
+1. **🔌 AI Agent Plugin (`plugin.json` + `/control-glass-mode`):**
+   * โครงสร้างเดียวกับ `cursor/plugins/pstack` มี Front-Door Router Skill ชื่อ **`/control-glass-mode`** ที่คอยจับคู่โจทย์เข้ากับ Playbooks (`feature.md`, `bug.md`, `gardener.md`, `review.md`) และคัดลอก Checklist ออกมาทำทีละขั้นโดยไม่ข้ามขั้นตอน
+2. **📦 Executable CLI & TypeScript Library (`npx control-glass`):**
+   * ติดตั้งผ่าน npm/GitHub ลงในโปรเจกต์ใดก็ได้ เพื่อรันคำสั่ง `npx control-glass init`, `npx control-glass verify`, `npx control-glass lock`, `npx control-glass lint`, และ `npx control-glass diff` พร้อม import Branded Types (`Brand`, `Result`, `ok`, `err`) ไปใช้งานได้ทันที
+
+---
+
+## 📖 คู่มือการใช้งานฉบับเต็ม (Documentation Guides)
+
+* 📘 **[01 — Getting Started & Installation](./docs/guide/01-getting-started.md)**: วิธีติดตั้งเป็น Plugin และวิธีติดตั้ง CLI ลงในโปรเจกต์ของคุณ (`npx control-glass init`)
+* 🧭 **[02 — Route Work Through `/control-glass-mode`](./docs/guide/02-control-glass-mode.md)**: วิธีใช้งาน `/control-glass-mode` เป็นประตูหน้าด่าน (Router Pattern) เพื่อสั่งงาน AI Agent อย่างมีวินัย (แบบเดียวกับ `02-poteto-mode.md`)
+* 🛡️ **[03 — Dune Architecture & The 6 Verification Gates](./docs/guide/03-dune-and-guardrails.md)**: เจาะลึก Branded Contracts, กฎ AST Linter, SHA-256 TDD Lock และการคัดแยก Tier 0 / Tier 1 / Tier 2
 
 ---
 
@@ -11,180 +30,118 @@
 2. **Review Overload (คอขวดย้ายไปที่การตรวจโค้ด):** งานเขียนโค้ดเสร็จเร็วขึ้น แต่เวลารอตรวจ Pull Request (Code Review) กลับช้าลงกว่า **400%** และเกิดบั๊กหลุดเข้า Production เพิ่มขึ้น **2–3 เท่า**
 3. **Closed-Loop Testing Error (AI โกงข้อสอบตัวเอง):** หากสั่งให้ AI เขียนทั้งโค้ดและ Unit Test พร้อมกัน AI มักจะแอบแก้ Test ให้ผ่านตามโค้ดที่ผิดของตัวเอง
 
-**`control-glass`** จึงถูกออกแบบมาโดยผสาน 2 แนวคิดระดับโลกเข้าด้วยกัน:
-* 🍳 **"Michelin Kitchen" & Dune Architecture** *(จากบทเรียนการส่งมอบ 2,000 PRs/เดือน ของทีม Grokbot / SpaceX AI)* — ทำให้ *"ทางลัดที่ง่ายที่สุด คือทางที่ถูกต้องเสมอ" (Make the easy path the right path)*
-* 🚦 **"The Bottleneck Moved" 3-Phase Framework** *(Context & Contracts -> Layered Guardrails -> Tiered Review Orchestration)* — ลดปริมาณงานที่ต้องใช้คนตรวจ ด้วยการคัดกรองความเสี่ยงอัตโนมัติ
-
 ---
 
-## 🏗️ สถาปัตยกรรมและการทำงาน 3 ระยะ (Architecture Overview)
+## 🏗️ สถาปัตยกรรมและการทำงานของ `/control-glass-mode`
 
 ```mermaid
 flowchart LR
-    subgraph Phase1["Phase 1: Context & Contracts (ก่อนเขียนโค้ด)"]
-        A1["AGENTS.md (สัญญากระชับ)"]
-        A2["feature-map.json (ความจำถาวร)"]
-        A3["Branded Types (ป้องกันส่งค่าผิดหน่วย)"]
-        A4["TDD SHA-256 Lock (ห้าม AI แอบแก้ Test)"]
+    subgraph Router["Front-Door Router (/control-glass-mode)"]
+        R0["User Goal"] --> R1["Match Playbook (feature / bug / gardener / review)"]
+        R1 --> R2["Copy Checklist Verbatim"]
     end
 
-    subgraph Phase2["Phase 2: Dune & Guardrails (ระหว่างเขียนโค้ด)"]
-        B1["Strict TypeScript (Level 1 Control)"]
-        B2["Dune AST Linter (ห้าม Comment / ล็อก Boundary)"]
-        B3["Safety & Secret Gate (ดัก API Key / คำสั่งอันตราย)"]
+    subgraph Phase1["Phase 1: Context & Contracts"]
+        A1["feature-map.json"]
+        A2["Branded Types (Brand<T>)"]
+        A3["TDD SHA-256 Lock (control-glass lock)"]
     end
 
-    subgraph Phase3["Phase 3: Control Glass & Orchestration (หลังเขียนโค้ด)"]
-        C1["Control Glass CLI (เก็บหลักฐาน Empirical Evidence)"]
-        C2["Diff & Consequence Analyzer"]
-        C3["Tiered Review Router (Tier 0 / Tier 1 / Tier 2)"]
+    subgraph Phase2["Phase 2: Dune & Guardrails"]
+        B1["Dune AST Linter (No-Comment / Boundary Lock)"]
+        B2["Safety & Secret Gate"]
     end
 
-    Phase1 --> Phase2 --> Phase3
+    subgraph Phase3["Phase 3: Control Glass & Tiered Review"]
+        C1["control-glass verify (Empirical Evidence)"]
+        C2["Tiered Review Router (Tier 0 / Tier 1 / Tier 2)"]
+    end
+
+    Router --> Phase1 --> Phase2 --> Phase3
 ```
 
 ---
 
-## 🛡️ 6 ด่านตรวจสอบหลักของ Control Glass
+## 🚀 วิธีนำไปติดตั้งในโปรเจกต์อื่น (How Other Developers Use This)
 
-ทุกครั้งที่รันคำสั่ง `npm run verify` ระบบจะตรวจสอบโค้ดผ่าน 6 ด่านอัตโนมัติ:
+### วิธีที่ 1: ติดตั้งเป็น Plugin ใน AI IDE (Antigravity / Cursor)
+```bash
+git clone https://github.com/Sakeerin/control-glass.git ~/.gemini/config/plugins/control-glass
+```
+เมื่อติดตั้งแล้วสามารถเรียกใช้ **`/control-glass-mode`** ในแชตเพื่อนำทางทุกงานวิศวกรรมซอฟต์แวร์ได้ทันที!
 
-| ลำดับ | ด่านตรวจสอบ (Gate) | หน้าที่และสิ่งที่ป้องกัน |
-| :---: | :--- | :--- |
-| **1** | **Strict TypeScript & Branded Contracts** | บังคับใช้ **Branded Types** (เช่น `NewtonSeconds`, `PoundForceSeconds`, `Satang`, `PercentageInt`) และ `Result<T, E>` ป้องกันการส่งตัวเลขผิดหน่วยข้ามโมดูล (กรณีศึกษา *Mars Climate Orbiter*) |
-| **2** | **Dune Custom AST Linter** | วิเคราะห์โครงสร้างโค้ดระดับ AST:<br>• **ห้ามใส่ Comment (`DUNE_NO_COMMENTS`):** ป้องกัน AI ใช้คอมเมนต์เป็นข้ออ้างในการเขียนโค้ดมักง่าย<br>• **ล็อกขอบเขตสถาปัตยกรรม (`DUNE_BOUNDARY_VIOLATION`):** ห้ามฝั่ง UI (`src/ui/`) import โมดูลระดับล่างหรือ Node I/O (`fs`, `child_process`)<br>• **ห้ามใช้ `any` / `as unknown` / `console.*`** |
-| **3** | **Safety & Secret Gate** | สแกนหา API Keys / Private Keys ที่รั่วไหลในโค้ด และบล็อกคำสั่งอันตราย (`DROP TABLE`, `TRUNCATE TABLE`, `rm -rf`, `eval`) ตามหลัก **Least Privilege** |
-| **4** | **TDD & Contract Immutability Lock** | ตรวจสอบค่า Hash (SHA-256) ของไฟล์ `tests/*.spec.ts` และ `src/core/contracts.ts` เทียบกับ `.control-glass/tdd-lock.json` **ป้องกันไม่ให้ AI แอบแก้ไฟล์เทสต์เพื่อให้โค้ดตัวเองผ่าน** |
-| **5** | **Empirical Unit & Contract Tests** | รันชุดทดสอบทั้งหมดผ่าน Vitest เพื่อยืนยันความถูกต้องของ Logic (รวมถึงการป้องกันธุรกรรมซ้ำแบบ *Knight Capital* และ Canary Gate แบบ *CrowdStrike*) |
-| **6** | **Tiered Review Orchestrator** | วิเคราะห์ `git diff` เทียบกับ `feature-map.json` เพื่อจัดระดับความเสี่ยงของงาน (**Tier 0, Tier 1, Tier 2**) และสร้างไฟล์หลักฐาน `.control-glass/evidence-latest.json` |
+### วิธีที่ 2: ติดตั้งเป็น CLI & Package ในโปรเจกต์ TypeScript ของคุณ
+```bash
+# 1. ติดตั้งลงในโปรเจกต์ของคุณ
+npm install --save-dev github:Sakeerin/control-glass
+
+# 2. สร้างไฟล์ตั้งต้น (feature-map.json, AGENTS.md, .control-glass/tdd-lock.json)
+npx control-glass init
+
+# 3. รันตรวจสอบ 6 ด่าน
+npx control-glass verify
+```
+
+สามารถ import Branded Contracts ไปใช้ในโค้ดของโปรเจกต์คุณได้โดยตรง:
+```typescript
+import { type Brand, type Result, ok, err } from "control-glass";
+
+export type OrderId = Brand<string, "OrderId">;
+```
 
 ---
 
-## 🚦 ระบบคัดแยกการรีวิวตามความเสี่ยง (Tiered Review Workflow)
+## 🛠️ คำสั่ง CLI ทั้งหมด (`npx control-glass <command>`)
 
-เพื่อแก้ปัญหาคอขวดที่มนุษย์ต้องตรวจทุก PR ระบบจะจำแนกงานออกเป็น 3 ระดับโดยอัตโนมัติ:
-
-* 🟢 **Tier 0 (Auto-Merge Eligible):** งานความเสี่ยงต่ำ เช่น การแก้ไขเฉพาะชั้นการแสดงผล (`src/ui/`) ที่ไม่กระทบ Contract และผ่านด่าน Control Glass 100% -> **สามารถตั้งค่าให้ผ่านอัตโนมัติโดยไม่ต้องรอมนุษย์รีวิว**
-* 🟡 **Tier 1 (Task Owner Review):** งานพัฒนาฟีเจอร์ทั่วไป (เช่น `src/features/rollout/`) -> ส่งรายงานสรุปผลกระทบ (Diff & Consequence Report) ให้เจ้าของงานตรวจอย่างรวดเร็ว
-* 🔴 **Tier 2 (Senior / Domain Expert Review):** งานความเสี่ยงสูงที่แตะ Core Contracts (`src/core/contracts.ts`), ระบบการเงิน (`settlement.ts`), ระบบคำนวณวิกฤต (`impulse-calculator.ts`), หรือตัว Harness (`src/harness/`) -> **บังคับให้ Senior Engineer เป็นผู้ตรวจสอบ**
+| คำสั่ง CLI | คำสั่ง npm (ในโปรเจกต์นี้) | คำอธิบาย |
+| :--- | :--- | :--- |
+| `npx control-glass init` | `npm run cli -- init` | สร้าง `feature-map.json`, `AGENTS.md`, และ `.control-glass/tdd-lock.json` ในโปรเจกต์ปลายทาง |
+| `npx control-glass verify` | `npm run verify` | **คำสั่งหลัก:** รันทุกด่านตรวจสอบพร้อมกัน และสร้างไฟล์หลักฐาน `.control-glass/evidence-latest.json` |
+| `npx control-glass lint` | `npm run lint:dune` | รัน Dune AST Linter ตรวจจับ Comment, การแหกกฎ Boundary Import, และการใช้ `any` |
+| `npx control-glass safety` | `npm run guard:safety` | สแกนหา API Keys/Secrets รั่วไหล และคำสั่งอันตรายในโค้ด |
+| `npx control-glass tdd-check` | `npm run guard:tdd` | ตรวจสอบว่าไฟล์ Test และ Contract ไม่ถูกแอบแก้ไขระหว่างที่ AI เขียนโค้ด |
+| `npx control-glass lock` | `npm run lock:tests` | อัปเดตค่า SHA-256 Lock ใน `.control-glass/tdd-lock.json` *(ใช้ใน Phase 1 ตอนล็อกสเปก)* |
+| `npx control-glass diff` | `npm run review:diff` | วิเคราะห์ไฟล์ที่เปลี่ยนแปลงใน Git เทียบกับ `feature-map.json` เพื่อจัดระดับ `Tier 0 / 1 / 2` |
 
 ---
 
-## 📂 โครงสร้างโปรเจกต์ (Project Structure)
+## 📂 โครงสร้างปลั๊กอินและแพ็กเกจ (Plugin & Package Structure)
 
 ```text
 control-glass/
-├── AGENTS.md                        # สัญญาหลักฉบับกระชับสำหรับสั่งการ AI Agent
-├── feature-map.json                 # Materialized Memory (แผนผังฟีเจอร์, ขอบเขต Import, และระดับ Tier)
-├── .control-glass/
-│   ├── tdd-lock.json                # รายการล็อก SHA-256 ของไฟล์ Test และ Contract
-│   └── evidence-latest.json         # หลักฐานผลการตรวจสอบล่าสุดจาก Control Glass CLI
-├── .agent/
-│   ├── rules/                       # กฎบังคับใช้กับ AI Agent อัตโนมัติใน Workspace
-│   └── skills/                      # Playbooks (PAC Workflow, Control Glass, Gardener, Diff Reviewer)
+├── plugin.json                      # Plugin Manifest (สำหรับติดตั้งเป็น AI Plugin)
+├── assets/logo.svg                  # ไอคอนประจำปลั๊กอิน
+├── rules/AGENTS.md                  # กฎหลักของปลั๊กอินที่ทำงานอัตโนมัติเมื่อเปิดใช้
+├── skills/                          # ชุดทักษะของปลั๊กอิน (เหมือน pstack/skills/)
+│   ├── control-glass-mode/          # 🧭 Main Router Skill (เทียบเท่า /poteto-mode)
+│   │   ├── SKILL.md
+│   │   └── playbooks/               # ขั้นตอนการทำงานมาตรฐาน (feature, bug, gardener, review)
+│   ├── setup-control-glass/         # ทักษะติดตั้งระบบลงโปรเจกต์ใหม่
+│   ├── pac-tdd-workflow/            # ทักษะออกแบบ Contract & ล็อก TDD
+│   ├── control-glass-verify/        # ทักษะรันเก็บหลักฐานเชิงประจักษ์
+│   ├── dune-gardener/               # ทักษะกำจัด Tech Debt และเขียนกฎ AST Linter
+│   └── diff-consequence-reviewer/   # ทักษะวิเคราะห์ผลกระทบและคัดกรอง Tier 0/1/2
+├── docs/guide/                      # คู่มือการใช้งานสไตล์ pstack
+│   ├── 01-getting-started.md
+│   ├── 02-control-glass-mode.md
+│   └── 03-dune-and-guardrails.md
 ├── src/
-│   ├── core/
-│   │   └── contracts.ts             # Branded Types, Result Monad และ Interface Contracts
-│   ├── features/                    # โดเมนฟีเจอร์ตามโครงสร้าง Single Paved Path
-│   │   ├── thruster/                # ตัวอย่างป้องกันบั๊กหน่วยวัด (Mars Climate Orbiter Safeguard)
-│   │   ├── ledger/                  # ตัวอย่างระบบการเงินและ Idempotency (Knight Capital Safeguard)
-│   │   └── rollout/                 # ตัวอย่างระบบ Canary Deployment 1%->10%->100% (CrowdStrike Safeguard)
-│   ├── ui/
-│   │   └── telemetry-view.ts        # ชั้นแสดงผล (Renderer-safe, Tier 0)
-│   └── harness/                     # เครื่องมือแกนหลักของ Control Glass
-│       ├── control-glass.ts         # Verification Pipeline CLI หลัก
-│       ├── dune-linter.ts           # ตัวตรวจจับ AST (No-Comment, Boundary Lock, No-Any)
-│       ├── tdd-guard.ts             # ระบบล็อกไฟล์ Test ป้องกัน Closed-Loop Testing Error
-│       ├── safety-gate.ts           # ด่านตรวจจับ Secret Leak และคำสั่งอันตราย
-│       └── diff-reviewer.ts         # ตัววิเคราะห์ Git Diff และจัดระดับ Tier 0 / 1 / 2
-└── tests/                           # ชุดทดสอบที่ถูกล็อกด้วย SHA-256
+│   ├── index.ts                     # Library Entrypoint สำหรับ import ไปใช้ในโปรเจกต์อื่น
+│   ├── core/contracts.ts            # Branded Types & Result Monad
+│   ├── harness/
+│   │   ├── cli.ts                   # Executable CLI (`npx control-glass`)
+│   │   ├── control-glass.ts         # 6-Gate Verification Runner
+│   │   ├── dune-linter.ts           # TypeScript AST Linter
+│   │   ├── tdd-guard.ts             # SHA-256 TDD Immutability Lock
+│   │   ├── safety-gate.ts           # Secret & Destructive Command Scanner
+│   │   └── diff-reviewer.ts         # Tier 0 / 1 / 2 Diff Orchestrator
+│   ├── features/                    # ตัวอย่างโดเมนฟีเจอร์ (Thruster, Ledger, Canary Rollout)
+│   └── ui/                          # ตัวอย่างชั้นแสดงผล (Renderer-safe Tier 0)
+└── tests/                           # ชุดทดสอบระบบที่ถูกล็อกด้วย SHA-256
 ```
 
 ---
 
-## 🚀 เริ่มต้นใช้งานอย่างรวดเร็ว (Quick Start)
-
-### 1. ติดตั้งแพ็กเกจ (Installation)
-ต้องมี **Node.js v20+** และ **Git** ติดตั้งอยู่ในเครื่อง:
-
-```bash
-git clone https://github.com/Sakeerin/control-glass.git
-cd control-glass
-npm install
-```
-
-### 2. รันระบบตรวจสอบ Control Glass ครบวงจร
-```bash
-npm run verify
-```
-หากทุกอย่างถูกต้อง คุณจะเห็นผลลัพธ์ดังนี้:
-```text
-🔬 [Control Glass] Starting Empirical Verification Pipeline...
-
-  1. [Level 1] Strict TypeScript Compiler: ✅ PASS
-  2. [Level 2] Dune AST Linter (10 files): ✅ PASS
-  3. [Phase 2] Safety & Secret Gate (15 files): ✅ PASS
-  4. [Phase 1] TDD & Contract Immutability Lock: ✅ PASS
-  5. [Level 1] Empirical Contract & Unit Tests: ✅ PASS
-  6. [Phase 3] Tiered Review Routing: 🎯 Tier 0 — AUTO-MERGE ELIGIBLE
-
-🏆 Control Glass Verification SUCCEEDED. High-trust quality verified!
-```
-
----
-
-## 🛠️ คำสั่ง CLI ทั้งหมด (Available Commands)
-
-| คำสั่ง | คำอธิบาย |
-| :--- | :--- |
-| `npm run verify` | **คำสั่งหลัก:** รันทุกด่านตรวจสอบพร้อมกัน และสร้างไฟล์หลักฐาน `.control-glass/evidence-latest.json` |
-| `npm run typecheck` | ตรวจสอบชนิดข้อมูลด้วย Strict TypeScript Compiler |
-| `npm run lint:dune` | รัน Dune AST Linter ตรวจจับ Comment, การแหกกฎ Boundary Import, และการใช้ `any` |
-| `npm run guard:safety` | สแกนหา API Keys/Secrets รั่วไหล และคำสั่งอันตรายในโค้ด |
-| `npm run guard:tdd` | ตรวจสอบว่าไฟล์ Test และ Contract ไม่ถูกแอบแก้ไขระหว่างที่ AI เขียนโค้ด |
-| `npm run lock:tests` | อัปเดตค่า SHA-256 Lock ใน `.control-glass/tdd-lock.json` *(ใช้เฉพาะใน Phase 1 ตอนตกลงสเปก/เขียน Test เสร็จใหม่ๆ)* |
-| `npm test` | รันชุดทดสอบ Unit & Contract Tests ด้วย Vitest |
-| `npm run review:diff` | วิเคราะห์ไฟล์ที่เปลี่ยนแปลงใน Git เทียบกับ `feature-map.json` เพื่อประเมินว่าต้องใช้คนรีวิวระดับใด (`Tier 0 / 1 / 2`) |
-
----
-
-## 👨‍💻 ขั้นตอนการพัฒนาฟีเจอร์ใหม่ร่วมกับ AI Agent (PAC Workflow)
-
-เมื่อคุณต้องการนำโปรเจกต์นี้ไปใช้พัฒนาฟีเจอร์ใหม่ ให้ปฏิบัติตาม **3 เฟสมาตรฐาน** ดังนี้:
-
-### Step 1: Phase 1 — กำหนดสัญญาและล็อกข้อสอบ (Spec Freeze & Lock Tests)
-1. นิยามชนิดข้อมูลแบบ **Branded Types** ใน `src/core/contracts.ts`
-2. เขียนไฟล์ทดสอบ `tests/<your-feature>.spec.ts` ให้ครอบคลุมเงื่อนไขที่ต้องการ และให้มนุษย์ยืนยันความถูกต้องของ Test
-3. รันคำสั่งล็อกไฟล์เทสต์:
-   ```bash
-   npm run lock:tests
-   ```
-
-### Step 2: Phase 2 — สั่งให้ AI Agent เขียนโค้ด (Single Paved Path Implementation)
-1. สั่งให้ AI Agent เขียนโค้ดฟีเจอร์ใน `src/features/<your-feature>/` หรือ `src/ui/` เพื่อให้ผ่านเทสต์ที่ล็อกไว้
-2. ลงทะเบียนฟีเจอร์ใหม่และระบุระดับความเสี่ยง (`Tier 0`, `Tier 1`, หรือ `Tier 2`) ลงใน `feature-map.json`
-3. *หมายเหตุ:* หาก AI เผลอเขียนคอมเมนต์, ใช้ `any`, ดึงโมดูลข้าม Boundary, หรือแอบแก้ไฟล์เทสต์ ด่านตรวจจะบล็อกทันที
-
-### Step 3: Phase 3 — ตรวจสอบหลักฐานและคัดกรองการรีวิว (Verify & Route)
-1. ให้ AI Agent รันคำสั่งยืนยันผลงาน:
-   ```bash
-   npm run verify
-   ```
-2. ดูผลการประเมิน **Review Tier** จากหน้าจอ หรือจากไฟล์ `.control-glass/evidence-latest.json` เพื่อตัดสินใจว่าสามารถ Merge อัตโนมัติ (`Tier 0`) หรือส่งต่อให้ผู้เชี่ยวชาญรีวิว (`Tier 1` / `Tier 2`)
-
----
-
-## 🌱 บทบาท "Gardener" (การดูแลสวนและหยุดการแพร่ระบาดของ Tech Debt)
-
-> *"Codebase is the best form of memory."* — โค้ดเบสคือความจำที่ดีที่สุดของ AI หากมีโค้ดมักง่ายหลุดเข้าไปแม้แต่จุดเดียว AI ตัวต่อๆ ไปจะคัดลอกรูปแบบนั้นและขยายผลออกไปเหมือนไวรัส
-
-เมื่อใดก็ตามที่คุณพบว่า AI เขียนโค้ดในรูปแบบที่ไม่พึงประสงค์ (Anti-pattern):
-1. **อย่าแก้แค่ที่ปลายเหตุใน PR นั้น**
-2. ให้เปิดไฟล์ `src/harness/dune-linter.ts` หรือ `src/harness/safety-gate.ts` แล้ว **เขียนกฎ AST ดักจับรูปแบบนั้นทันที** เพื่อทำให้ความผิดพลาดแบบเดิมไม่สามารถเกิดขึ้นได้อีกอย่างถาวร (*Stop the bleeding*)
-
----
-
-## 📚 เอกสารอ้างอิงในโปรเจกต์
+## 📚 เอกสารแนวคิดต้นฉบับ
 * [document.md](./document.md) — บทสรุปแนวคิด *"Michelin Kitchen"* และ 4 เสาหลักในการควบคุมกองทัพ AI Agent (Grokbot / Dune / Control Glass / PAC)
 * [document2.md](./document2.md) — บทสรุปแนวคิด *"The Bottleneck Moved"* และกรอบการแก้ปัญหาคอขวด 3 ระยะ (Context, Guardrails, Orchestration)
-* [AGENTS.md](./AGENTS.md) — กฎเหล็กและรายการคำสั่งมาตรฐานสำหรับ AI Agent

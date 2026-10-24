@@ -1,9 +1,31 @@
 {
   "name": "control-glass",
   "version": "1.0.0",
-  "description": "High-Trust Agentic Engineering Harness combining Michelin Kitchen (Dune, Control Glass, PAC) and The Bottleneck Moved (3-Phase Guardrails, Contracts, Tiered Review)",
+  "description": "High-Trust Agentic Engineering Plugin & CLI combining Michelin Kitchen (Dune, Control Glass, PAC) and 3-Phase Bottleneck Guardrails",
   "type": "module",
+  "main": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "bin": {
+    "control-glass": "./dist/harness/cli.js"
+  },
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
+  "files": [
+    "dist",
+    "skills",
+    "rules",
+    "docs",
+    "assets",
+    "plugin.json",
+    "AGENTS.md",
+    "README.md"
+  ],
   "scripts": {
+    "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint:dune": "tsx src/harness/dune-linter.ts",
     "guard:safety": "tsx src/harness/safety-gate.ts",
@@ -11,15 +33,25 @@
     "test": "vitest run",
     "verify": "tsx src/harness/control-glass.ts",
     "review:diff": "tsx src/harness/diff-reviewer.ts",
-    "lock:tests": "tsx src/harness/tdd-guard.ts --update-lock"
+    "lock:tests": "tsx src/harness/tdd-guard.ts --update-lock",
+    "cli": "tsx src/harness/cli.ts"
   },
+  "keywords": [
+    "ai-agent",
+    "cursor-plugin",
+    "antigravity-plugin",
+    "control-glass",
+    "dune-framework",
+    "ast-linter",
+    "tdd-lock"
+  ],
   "dependencies": {
+    "typescript": "^5.8.2",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.13.4",
     "tsx": "^4.19.3",
-    "typescript": "^5.8.2",
     "vitest": "^3.0.7"
   }
 }

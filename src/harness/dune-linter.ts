@@ -47,7 +47,8 @@ function getLineNumber(sourceFile: ts.SourceFile, pos: number): number {
 
 function checkNoComments(sourceFile: ts.SourceFile, relativePath: string): LintViolation[] {
   const violations: LintViolation[] = [];
-  const text = sourceFile.getFullText();
+  const rawText = sourceFile.getFullText();
+  const text = rawText.startsWith("#!") ? rawText.replace(/^#!.*(?:\r?\n|$)/, "\n") : rawText;
   const scanner = ts.createScanner(
     ts.ScriptTarget.Latest,
     false,
