@@ -114,11 +114,11 @@ export function collectPolyglotSourceFiles(
   return results;
 }
 
-function stripStringsFromLine(line: string): string {
+function maskStringsPreserveLength(line: string): string {
   return line
-    .replace(/"(?:\\.|[^"\\])*"/g, '""')
-    .replace(/'(?:\\.|[^'\\])*'/g, "''")
-    .replace(/`(?:\\.|[^`\\])*`/g, "``");
+    .replace(/"(?:\\.|[^"\\])*"/g, (m) => " ".repeat(m.length))
+    .replace(/'(?:\\.|[^'\\])*'/g, (m) => " ".repeat(m.length))
+    .replace(/`(?:\\.|[^`\\])*`/g, (m) => " ".repeat(m.length));
 }
 
 function isAllowedDirectiveComment(lang: SupportedLanguage, lineIdx: number, trimmedComment: string): boolean {
@@ -166,7 +166,7 @@ export function lintNonTsSourceText(
       return;
     }
 
-    const codeOnly = stripStringsFromLine(rawLine);
+    const codeOnly = maskStringsPreserveLength(rawLine);
 
     if ((lang === "go" || lang === "php") && codeOnly.includes("/*")) {
       const commentStart = rawLine.slice(codeOnly.indexOf("/*"));
@@ -432,7 +432,7 @@ export function stripNonTsComments(
   const outLines: string[] = [];
 
   lines.forEach((rawLine, idx) => {
-    const codeOnly = stripStringsFromLine(rawLine);
+    const codeOnly = maskStringsPreserveLength(rawLine);
 
     if (lang === "python" || lang === "php") {
       const hashIdx = codeOnly.indexOf("#");
