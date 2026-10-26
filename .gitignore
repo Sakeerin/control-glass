@@ -3,6 +3,8 @@ dist/
 .control-glass/evidence-latest.json
 .control-glass/dependency-graph.json
 .control-glass/bench-latest.json
+document.md
+document2.md
 *.log
 .env
 .env.*
