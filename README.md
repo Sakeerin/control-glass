@@ -46,23 +46,24 @@ npx control-glass init --lang all      # สร้างครบทุกภา
 
 ---
 
-## ⚡ ทำไม `control-glass` v2.2 ถึงเหนือกว่า `pstack`? (Comparison Matrix)
+## ⚡ ทำไม `control-glass` v3.0 ถึงเหนือกว่า `pstack`? (Comparison Matrix)
 
 แม้ `pstack` (`/poteto-mode`) จะวางโครงสร้าง Playbooks ที่ดีเยี่ยม แต่ `pstack` เป็นเพียง **ไฟล์ Markdown (Prompt-only / Level 3 Control)** ซึ่งหาก AI เผลอหลอนหรือแหกกฎ จะไม่มีโปรแกรมใดคอยบล็อกจริง
 
-**`control-glass` v2.2** จึงผสาน **Multi-Skill Router ของ `pstack`** เข้ากับ **Executable TypeScript AST & Cryptographic Engine (Level 1 & 2 Control)**:
+**`control-glass` v3.0** จึงผสาน **Multi-Skill Router ของ `pstack`** เข้ากับ **Executable Polyglot AST & Cryptographic Engine (Level 1 & 2 Control)**:
 
-| ความสามารถ | `pstack` (`/poteto-mode`) | `control-glass` (`/control-glass-mode` v2.2) |
+| ความสามารถ | `pstack` (`/poteto-mode`) | `control-glass` (`/control-glass-mode` v3.0) |
 | :--- | :--- | :--- |
 | **Front-Door Router & Playbooks** | `/poteto-mode` (Markdown) | **`/control-glass-mode`** (5 Playbooks: `feature`, `bug`, `perf`, `gardener`, `review`) |
+| **Polyglot Language Support** | ไม่มีการตรวจระดับภาษา | **4 ภาษาหลัก:** รองรับ **TypeScript (`.ts`), Python (`.py`), Go (`.go`), และ PHP (`.php`)** พร้อม Branded Contract Generator |
 | **Multi-Vendor AI Support** | รองรับเฉพาะ Cursor | **Universal:** รองรับ Claude Code, OpenAI Codex, Cursor, Copilot, Windsurf, Antigravity + **MCP Server** |
-| **Code Comprehension (`/how`, `/why`)** | ให้ AI นั่งอ่านโค้ดสดทุกครั้ง (เปลือง Token) | **`/how-why` + `npx control-glass map`** สร้าง AST Dependency Graph (`.control-glass/dependency-graph.json`) แม่นยำ 100% |
-| **Diff Hygiene (`/deslop`)** | สั่ง Prompt ให้ AI ช่วยดูโค้ดขยะ | **`/deslop` + `npx control-glass deslop --fix`** ใช้ TypeScript AST ลบคอมเมนต์อัตโนมัติ และดักจับ `catch {}` ว่าง, `debugger`, และฟังก์ชัน Wrapper ขยะ (`TRIVIAL_PASS_THROUGH_WRAPPER`) |
-| **Boundary & Suppression Lock** | ❌ ไม่มี | **Dune AST Linter:** ดักจับทั้ง `import`, `export from`, `import()`, `require()` ข้าม Boundary และบล็อก `@ts-ignore` / `eslint-disable` (`DUNE_NO_LINTER_SUPPRESSION`) |
+| **Code Comprehension (`/how`, `/why`)** | ให้ AI นั่งอ่านโค้ดสดทุกครั้ง (เปลือง Token) | **`/how-why` + `npx control-glass map`** สร้าง Polyglot Dependency Graph (`.control-glass/dependency-graph.json`) แม่นยำ 100% |
+| **Diff Hygiene (`/deslop`)** | สั่ง Prompt ให้ AI ช่วยดูโค้ดขยะ | **`/deslop` + `npx control-glass deslop --fix`** ลบคอมเมนต์อัตโนมัติในทั้ง 4 ภาษา และดักจับ `catch {}` ว่าง, `except: pass`, `_ = err`, `debugger`, และ Trivial Wrapper |
+| **Boundary & Suppression Lock** | ❌ ไม่มี | **Polyglot Dune Linter:** ดักจับการ Import ข้าม Boundary ในทุกภาษา และบล็อก `@ts-ignore`, `# type: ignore`, `//nolint`, `@phpstan-ignore` |
 | **Design Competition (`/arena`)** | อภิปรายเปรียบเทียบด้วยทฤษฎี | **`/arena`** ให้คะแนน 0–100 ตามเกณฑ์ Continuum of Control (Branded Types, Boundary Isolation, Tier Impact) |
 | **Adversarial Review (`/interrogate`)** | ถาม-ตอบทั่วไป | **`/interrogate` + `agents/interrogator.md`** ตรวจสอบกับ 4 กรณีศึกษาหายนะจริง (*Mars Orbiter, Knight Capital, Google Cloud, CrowdStrike*) |
-| **Anti-Closed-Loop Testing** | ❌ ไม่มี (AI แก้เทสต์ตัวเองได้) | ✅ **Recursive SHA-256 TDD Lock (`tdd-guard.ts`)** ล็อกทั้ง `*.spec.ts`, `*.test.ts`, `*.contract.ts` ทุกโฟลเดอร์ย่อย |
-| **Performance Hill-Climbing** | สั่งด้วย Prompt | ✅ **`npx control-glass bench`** วัด ops/sec และ V8 Heap Memory Delta จริง (พร้อม API `measureWorkload` สำหรับโปรเจกต์ผู้บริโภค) |
+| **Anti-Closed-Loop Testing** | ❌ ไม่มี (AI แก้เทสต์ตัวเองได้) | ✅ **Recursive SHA-256 TDD Lock (`tdd-guard.ts`)** ล็อกทั้ง `*.spec.ts`, `test_*.py`, `*_test.go`, `*Test.php` และไฟล์ Contracts ทุกโฟลเดอร์ย่อย |
+| **Performance Hill-Climbing** | สั่งด้วย Prompt | ✅ **`npx control-glass bench`** วัด ops/sec และ V8 Heap Memory Delta จริง (พร้อม API `measureWorkload`) |
 | **Zero-Bypass Enforcement** | ❌ ลืมเรียกสกิล = หลุดเข้า Git | ✅ **`npx control-glass install-hooks`** ฝัง Git `pre-commit` hook + GitHub Actions CI บล็อกอัตโนมัติ |
 
 ---
@@ -77,7 +78,7 @@ npx control-glass init --lang all      # สร้างครบทุกภา
 
 ---
 
-## 🏗️ สถาปัตยกรรมและการทำงานของ `/control-glass-mode` v2.2 (7-Gate Pipeline)
+## 🏗️ สถาปัตยกรรมและการทำงานของ `/control-glass-mode` v3.0 (7-Gate Polyglot Pipeline)
 
 ```mermaid
 flowchart LR
@@ -87,17 +88,17 @@ flowchart LR
     end
 
     subgraph Skills["Specialized Skills & Subagents"]
-        S1["/how-why (AST Dependency Graph)"]
+        S1["/how-why (Polyglot Dependency Graph)"]
         S2["/arena (Contract Scorecard)"]
-        S3["/deslop (AST Slop Cleaner)"]
+        S3["/deslop (Polyglot Slop Cleaner)"]
         S4["/interrogate (Red-Team Subagent)"]
     end
 
     subgraph Engine["7-Gate Control Glass Engine (npx control-glass verify)"]
-        E1["Gate 1: Strict TS & Branded Contracts"]
-        E2["Gate 2 & 3: Dune AST Linter & Deslop Engine"]
+        E1["Gate 1: Compiler & Branded Contracts (.ts/.py/.go/.php)"]
+        E2["Gate 2 & 3: Polyglot Dune Linter & Deslop Engine"]
         E3["Gate 4 & 5: Safety Gate & SHA-256 TDD Lock"]
-        E4["Gate 6 & 7: Vitest + AST Map & Tier 0/1/2 Router"]
+        E4["Gate 6 & 7: Tests + Dependency Map & Tier 0/1/2 Router"]
     end
 
     Router --> Skills --> Engine
@@ -105,13 +106,13 @@ flowchart LR
 
 ### 🛡️ สรุป 7 ด่านตรวจสอบหลัก (`npx control-glass verify`)
 
-1. **[Level 1] Strict TypeScript Compiler:** ตรวจสอบความถูกต้องของชนิดข้อมูลและ **Branded Types** (`NewtonSeconds`, `PoundForceSeconds`, `Satang`, `PercentageInt`)
-2. **[Level 2] Dune AST Linter:** บังคับกฎไร้คอมเมนต์ (`DUNE_NO_COMMENTS`), ห้ามปิดคำเตือน (`DUNE_NO_LINTER_SUPPRESSION`), ล็อกขอบเขตการ Import ทั้งแบบ Static และ Dynamic (`DUNE_BOUNDARY_VIOLATION`), ห้ามใช้ `any` และห้ามใช้ `console.*` ในโดเมน
-3. **[Level 2] AST Deslop Engine:** ตรวจจับ `catch {}` ว่างที่กลืน Error (`EMPTY_CATCH_BLOCK`), `debugger` ที่หลงเหลือ (`DEBUG_LEFTOVER`), และฟังก์ชัน Wrapper ขยะ (`TRIVIAL_PASS_THROUGH_WRAPPER`)
-4. **[Phase 2] Safety & Secret Gate:** สแกนหา API Keys/Credentials รั่วไหล และบล็อกคำสั่งอันตราย (`DROP TABLE`, `TRUNCATE TABLE`, `rm -rf`, `eval`)
-5. **[Phase 1] Recursive TDD & Contract Immutability Lock:** ตรวจสอบค่า SHA-256 ของไฟล์ `*.spec.ts`, `*.test.ts`, และ `*.contract.ts` ป้องกันไม่ให้ AI แอบแก้ข้อสอบตัวเอง
-6. **[Level 1] Empirical Contract & Unit Tests:** รันชุดทดสอบทั้งหมดด้วย Vitest
-7. **[Phase 3] AST Dependency Graph & Tiered Review Routing:** สร้าง `.control-glass/dependency-graph.json` และคำนวณระดับการรีวิว (`Tier 0` Auto-Merge / `Tier 1` Task Owner / `Tier 2` Senior Review) รองรับทั้ง Working Tree และ Git Commit History บน CI
+1. **[Level 1] Static Compiler & Contract Check:** ตรวจสอบความถูกต้องของชนิดข้อมูลและ **Branded Types / Value Objects** (`NewtonSeconds`, `PoundForceSeconds`, `Satang`, `PercentageInt`)
+2. **[Level 2] Polyglot Dune Linter (`.ts`, `.py`, `.go`, `.php`):** บังคับกฎไร้คอมเมนต์ (`DUNE_NO_COMMENTS`), ห้ามปิดคำเตือน (`DUNE_NO_LINTER_SUPPRESSION`), บังคับ `declare(strict_types=1);` ใน PHP (`DUNE_PHP_STRICT_TYPES_REQUIRED`), ล็อกขอบเขตการ Import (`DUNE_BOUNDARY_VIOLATION`), ห้ามใช้ `any`/`Any`/`interface{}`/`mixed` และห้ามใช้ `console.*`/`print`/`fmt.Print*`/`var_dump` ในโดเมน
+3. **[Level 2] Polyglot Deslop Engine:** ตรวจจับ `catch {}` ว่าง, `except: pass` (Python), `_ = err` (Go), `debugger`/`breakpoint()`/`xdebug_break()`, และฟังก์ชัน Wrapper ขยะ (`TRIVIAL_PASS_THROUGH_WRAPPER`)
+4. **[Phase 2] Safety & Secret Gate:** สแกนหา API Keys/Credentials รั่วไหล และบล็อกคำสั่งอันตราย (`DROP TABLE`, `TRUNCATE TABLE`, `rm -rf`, `eval`) ในทุกโฟลเดอร์ (`src/`, `app/`, `pkg/`, `internal/`, `tests/`)
+5. **[Phase 1] Recursive Polyglot TDD & Contract Immutability Lock:** ตรวจสอบค่า SHA-256 ของไฟล์เทสต์และสัญญาทั้ง 4 ภาษา (`*.spec.ts`, `*.test.ts`, `test_*.py`, `*_test.py`, `*_test.go`, `*Test.php`, `contracts.ts`, `contracts.py`, `contracts.go`, `Contracts.php`) ป้องกันไม่ให้ AI แอบแก้ข้อสอบตัวเอง
+6. **[Level 1] Empirical Contract & Unit Tests:** รันชุดทดสอบทั้งหมดเพื่อยืนยันความถูกต้องของ Logic
+7. **[Phase 3] Polyglot Dependency Graph & Tiered Review Routing:** สร้าง `.control-glass/dependency-graph.json` และคำนวณระดับการรีวิว (`Tier 0` Auto-Merge / `Tier 1` Task Owner / `Tier 2` Senior Review) รองรับทั้ง Working Tree และ Git Commit History บน CI
 
 ---
 
@@ -123,13 +124,13 @@ git clone https://github.com/Sakeerin/control-glass.git ~/.gemini/config/plugins
 ```
 เมื่อติดตั้งแล้วสามารถเรียกใช้ **`/control-glass-mode`**, **`/arena`**, **`/interrogate`**, **`/deslop`**, และ **`/how-why`** ในแชตได้ทันที!
 
-### วิธีที่ 2: ติดตั้งเป็น CLI & Package ในโปรเจกต์ TypeScript ของคุณ
+### วิธีที่ 2: ติดตั้งเป็น CLI ในโปรเจกต์ TypeScript, Python, Go หรือ PHP ของคุณ
 ```bash
-# 1. ติดตั้งลงในโปรเจกต์ของคุณ (มีสคริปต์ prepack คอมไพล์ dist/ ให้อัตโนมัติ)
+# 1. ติดตั้ง CLI ลงในโปรเจกต์ของคุณ
 npm install --save-dev github:Sakeerin/control-glass
 
-# 2. สร้างไฟล์ตั้งต้น (feature-map.json, AGENTS.md, CLAUDE.md, .cursor/rules, .control-glass/tdd-lock.json)
-npx control-glass init
+# 2. สร้างไฟล์ตั้งต้นพร้อม Contract Template ตามภาษาที่ใช้ (typescript | python | go | php | all)
+npx control-glass init --lang all
 
 # 3. ติดตั้ง Git Pre-Commit Hook & GitHub Actions CI
 npx control-glass install-hooks
@@ -179,7 +180,7 @@ export type OrderId = Brand<string, "OrderId">;
 
 ```text
 control-glass/
-├── plugin.json                      # Plugin Manifest v2.2
+├── plugin.json                      # Plugin Manifest v3.0
 ├── mcp_config.json                  # การตั้งค่า MCP Server มาตรฐาน
 ├── AGENTS.md                        # สัญญาหลักสำหรับ OpenAI Codex / Universal Agents
 ├── CLAUDE.md                        # สัญญาหลักสำหรับ Anthropic Claude Code
@@ -191,21 +192,34 @@ control-glass/
 │   └── interrogator.md              # 🕵️‍♂️ Red-Team Adversarial Reviewer Subagent
 ├── skills/                          # ชุดทักษะของปลั๊กอิน
 │   ├── control-glass-mode/          # 🧭 Main Router Skill (5 Playbooks: feature, bug, perf, gardener, review)
-│   ├── how-why/                     # 🗺️ AST Dependency Graph & Git Intent Comprehension
+│   ├── how-why/                     # 🗺️ Polyglot Dependency Graph & Git Intent Comprehension
 │   ├── arena/                       # 🏛️ Contract-Driven Architecture Competition (100-pt Scorecard)
-│   ├── deslop/                      # 🧹 Deterministic AST Slop Cleaner
+│   ├── deslop/                      # 🧹 Deterministic Polyglot Slop Cleaner
 │   ├── interrogate/                 # 🕵️‍♂️ 4-Disaster Adversarial Audit
 │   ├── setup-control-glass/         # ⚙️ ทักษะตั้งค่าระบบลงโปรเจกต์ใหม่
 │   ├── pac-tdd-workflow/            # 🔒 ทักษะออกแบบ Contract & ล็อก TDD
 │   ├── control-glass-verify/        # 🔬 ทักษะรันเก็บหลักฐานเชิงประจักษ์
-│   ├── dune-gardener/               # 🌱 ทักษะกำจัด Tech Debt และเขียนกฎ AST Linter
+│   ├── dune-gardener/               # 🌱 ทักษะกำจัด Tech Debt และเขียนกฎ Linter
 │   └── diff-consequence-reviewer/   # 🚦 ทักษะวิเคราะห์ผลกระทบและคัดกรอง Tier 0/1/2
-├── docs/guide/                      # คู่มือการใช้งานฉบับสมบูรณ์ (01 - 04)
+├── docs/guide/                      # คู่มือการใช้งานฉบับสมบูรณ์ (01 - 05)
 ├── src/
 │   ├── index.ts                     # Library Entrypoint
 │   ├── core/contracts.ts            # Branded Types & Result Monad
 │   ├── vendors/llm-gateway.ts       # Multi-Vendor LLM Payload Adapter (Claude, OpenAI, Gemini, Ollama)
-│   ├── harness/                     # Executable 7-Gate Engine & MCP Server
+│   ├── harness/
+│   │   ├── polyglot-engine.ts       # 💻 Built-in Polyglot Engine (TypeScript, Python, Go, PHP)
+│   │   ├── control-glass.ts         # 7-Gate Verification Pipeline Runner
+│   │   ├── dune-linter.ts           # Polyglot Dune Linter
+│   │   ├── deslop.ts                # Polyglot Slop Detector & Comment Stripper
+│   │   ├── auto-mapper.ts           # Polyglot Dependency & Export Graph Builder
+│   │   ├── tdd-guard.ts             # Recursive SHA-256 TDD Lock (.ts, .py, .go, .php)
+│   │   ├── safety-gate.ts           # Secret Leak & Destructive Command Scanner
+│   │   ├── diff-reviewer.ts         # Tier 0 / 1 / 2 Diff Orchestrator
+│   │   ├── bench.ts                 # Runtime & V8 Heap Hill-Climber
+│   │   ├── mcp-server.ts            # Universal Model Context Protocol (MCP) Server
+│   │   ├── vendor-sync.ts           # Multi-Vendor AI Config Synchronizer
+│   │   ├── hook-installer.ts        # Git Pre-Commit & GitHub Actions CI Installer
+│   │   └── cli.ts                   # Executable CLI (`npx control-glass`)
 │   ├── features/                    # ตัวอย่างโดเมนฟีเจอร์ (Thruster, Ledger, Canary Rollout)
 │   └── ui/                          # ตัวอย่างชั้นแสดงผล (Renderer-safe Tier 0)
 ├── tests/                           # ชุดทดสอบระบบที่ถูกล็อกด้วย SHA-256
