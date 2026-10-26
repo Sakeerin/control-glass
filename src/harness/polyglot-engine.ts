@@ -80,7 +80,17 @@ export function detectProjectLanguages(rootDir: string = process.cwd()): readonl
 
 export function collectPolyglotSourceFiles(
   rootDir: string,
-  subDirs: readonly string[] = ["src", "app", "pkg", "internal", "cmd"]
+  subDirs: readonly string[] = [
+    "src",
+    "app",
+    "pages",
+    "components",
+    "server",
+    "lib",
+    "pkg",
+    "internal",
+    "cmd"
+  ]
 ): string[] {
   const results: string[] = [];
 
@@ -96,6 +106,8 @@ export function collectPolyglotSourceFiles(
         const isTestFile =
           entry.name.endsWith(".spec.ts") ||
           entry.name.endsWith(".test.ts") ||
+          entry.name.endsWith(".spec.tsx") ||
+          entry.name.endsWith(".test.tsx") ||
           entry.name.endsWith("_test.py") ||
           entry.name.startsWith("test_") ||
           entry.name.endsWith("_test.go") ||

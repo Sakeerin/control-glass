@@ -132,4 +132,23 @@ describe("Polyglot Engine (Python, Go, PHP) Verification & Deslop", () => {
     expect(strippedGo.cleanedText).toContain("https://example.com//path");
     expect(strippedGo.cleanedText).not.toContain("strip go comment");
   });
+
+  it("parses React JSX (.tsx) components accurately without false-positive type assertion errors", async () => {
+    const ts = await import("typescript");
+    const tsxCode = [
+      "import type { TelemetryReadoutViewModel } from '../core/contracts.js';",
+      "export function TelemetryCard(props: { readonly vm: TelemetryReadoutViewModel }) {",
+      "  return <section className=\"card\" data-status={props.vm.status}>{props.vm.missionName}</section>;",
+      "}"
+    ].join("\n");
+
+    const sf = ts.default.createSourceFile(
+      "src/ui/TelemetryCard.tsx",
+      tsxCode,
+      ts.default.ScriptTarget.Latest,
+      true,
+      ts.default.ScriptKind.TSX
+    );
+    expect(sf.statements.length).toBe(2);
+  });
 });

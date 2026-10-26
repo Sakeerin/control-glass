@@ -133,12 +133,13 @@ export function runDeslopEngine(
         }
       }
 
+      const scriptKind = relPath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
       const sf = ts.createSourceFile(
         relPath,
         content,
         ts.ScriptTarget.Latest,
         true,
-        ts.ScriptKind.TS
+        scriptKind
       );
 
       const visit = (node: ts.Node): void => {

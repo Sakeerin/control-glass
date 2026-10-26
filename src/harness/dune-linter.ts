@@ -244,12 +244,13 @@ export function runDuneLinter(rootDir: string = process.cwd()): {
     const lang = detectLanguageFromFile(filePath);
 
     if (lang === "typescript") {
+      const scriptKind = relativePath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
       const sourceFile = ts.createSourceFile(
         relativePath,
         content,
         ts.ScriptTarget.Latest,
         true,
-        ts.ScriptKind.TS
+        scriptKind
       );
 
       violations.push(...checkNoComments(sourceFile, relativePath));

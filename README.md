@@ -4,11 +4,11 @@
 
 ---
 
-## 💻 รองรับ 4 ภาษาหลักแบบ Polyglot (`TypeScript`, `Python`, `Go`, `PHP`)
+## 💻 รองรับ 4 ภาษาหลัก & เฟรมเวิร์กยอดนิยม (`React`, `Node.js`, `TypeScript`, `Python`, `Go`, `PHP`)
 
-ไม่ต้องกังวลว่าโปรเจกต์ของคุณจะเขียนด้วยภาษาอะไร `control-glass` v3.0 มี **Built-in Polyglot Engine (`src/harness/polyglot-engine.ts`)** ที่บังคับใช้กฎ Dune Linter, Deslop, Auto-Mapper และ SHA-256 TDD Lock ในทั้ง 4 ภาษาโดยไม่ต้องลงปลั๊กอินแยก:
+ไม่ต้องกังวลว่าโปรเจกต์ของคุณจะเขียนด้วยภาษาหรือเฟรมเวิร์กอะไร (`React / Next.js / Vite (.tsx)`, `Node.js / Express / NestJS (.ts)`, `Python`, `Go`, หรือ `PHP / Laravel`) `control-glass` v3.0 มี **Built-in Polyglot Engine (`src/harness/polyglot-engine.ts`)** ที่บังคับใช้กฎ Dune Linter, Deslop, Auto-Mapper และ SHA-256 TDD Lock ในทั้ง 4 ภาษาโดยไม่ต้องลงปลั๊กอินแยก:
 
-| มิติการควบคุม | 🟦 TypeScript (`.ts`) | 🐍 Python (`.py`) | 🐹 Go (`.go`) | 🐘 PHP (`.php`) |
+| มิติการควบคุม | 🟦 TypeScript / React / Node.js (`.ts`, `.tsx`) | 🐍 Python (`.py`) | 🐹 Go (`.go`) | 🐘 PHP (`.php`) |
 | :--- | :--- | :--- | :--- | :--- |
 | **Level 1: Branded Contracts** | `Brand<T, Name>` + `Result<T, E>` | `typing.NewType` + `@dataclass(frozen=True) Ok/Err` | Distinct Types (`type Satang int64`) + `(T, error)` | `final readonly class` + `declare(strict_types=1);` |
 | **No Comments (`DUNE_NO_COMMENTS`)** | บล็อก `//`, `/* */` | บล็อก `#`, `"""` | บล็อก `//`, `/* */` | บล็อก `//`, `#`, `/* */` |
@@ -16,7 +16,7 @@
 | **No Weak Types (`DUNE_NO_EXPLICIT_ANY`)** | บล็อก `any`, `as unknown` | บล็อก `typing.Any` | บล็อก `interface{}`, `any` | บล็อก `mixed` & บังคับ `declare(strict_types=1);` |
 | **No Debug Output (`DUNE_NO_CONSOLE_IN_DOMAIN`)** | บล็อก `console.*` | บล็อก `print(...)` | บล็อก `fmt.Print*` | บล็อก `var_dump`, `dd`, `print_r`, `echo` |
 | **Deslop Engine (`npx control-glass deslop --fix`)** | ลบคอมเมนต์ + ดัก `catch {}` & `debugger` | ลบ `#` + ดัก `except: pass` & `breakpoint()` | ลบ `//` + ดัก `_ = err` | ลบ `//`, `#` + ดัก `catch (...) {}` & `xdebug_break()` |
-| **SHA-256 TDD Lock (`npx control-glass lock`)** | `*.spec.ts`, `*.test.ts`, `contracts.ts` | `test_*.py`, `*_test.py`, `contracts.py` | `*_test.go`, `contracts.go` | `*Test.php`, `Contracts.php` |
+| **SHA-256 TDD Lock (`npx control-glass lock`)** | `*.spec.ts`, `*.test.tsx`, `contracts.ts` | `test_*.py`, `*_test.py`, `contracts.py` | `*_test.go`, `contracts.go` | `*Test.php`, `Contracts.php` |
 
 สามารถสร้างไฟล์ตั้งต้น Branded Contracts สำหรับแต่ละภาษาได้ทันทีด้วย:
 ```bash

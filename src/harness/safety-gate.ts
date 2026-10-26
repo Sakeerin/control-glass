@@ -55,6 +55,7 @@ function collectScannableFiles(dirPath: string): string[] {
     } else if (
       entry.isFile() &&
       (entry.name.endsWith(".ts") ||
+        entry.name.endsWith(".tsx") ||
         entry.name.endsWith(".py") ||
         entry.name.endsWith(".go") ||
         entry.name.endsWith(".php") ||
@@ -74,6 +75,10 @@ export function runSafetyGate(rootDir: string = process.cwd()): {
   const targetDirs = [
     path.join(rootDir, "src"),
     path.join(rootDir, "app"),
+    path.join(rootDir, "pages"),
+    path.join(rootDir, "components"),
+    path.join(rootDir, "server"),
+    path.join(rootDir, "lib"),
     path.join(rootDir, "pkg"),
     path.join(rootDir, "internal"),
     path.join(rootDir, "tests")

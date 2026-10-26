@@ -103,12 +103,13 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
     const content = fs.readFileSync(absPath, "utf8");
 
     if (lang === "typescript") {
+      const scriptKind = relPath.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS;
       const sf = ts.createSourceFile(
         relPath,
         content,
         ts.ScriptTarget.Latest,
         true,
-        ts.ScriptKind.TS
+        scriptKind
       );
 
       sf.forEachChild((node) => {
