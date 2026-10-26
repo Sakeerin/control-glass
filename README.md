@@ -1,6 +1,30 @@
-# 🔬 Control Glass v2.2 (`control-glass`)
+# 🔬 Control Glass v3.0 (`control-glass`)
 
-> **Universal Multi-Vendor Agentic Engineering Plugin, MCP Server & CLI** — รองรับการทำงานกับ AI ทุกค่าย (**Anthropic Claude, OpenAI Codex/GPT, Google Gemini/Antigravity, Cursor, GitHub Copilot, Windsurf & Local Ollama**) เปลี่ยน AI Coding Agent จาก *"สายพานโรงงานที่ผลิตโค้ดขยะ (Slop Factory)"* สู่ **"ครัวมิชลิน (Michelin Kitchen)"** ที่ตรวจสอบด้วยหลักฐานเชิงประจักษ์ 7 ด่าน (7-Gate Empirical Verification)
+> **Universal Polyglot (TypeScript, Python, Go, PHP) & Multi-Vendor AI Agentic Engineering Plugin, MCP Server & CLI** — รองรับทั้ง **4 ภาษาหลัก (`.ts`, `.py`, `.go`, `.php`)** และทำงานร่วมกับ **AI ทุกค่าย (Claude, OpenAI, Gemini, Cursor, Copilot, Windsurf & Local Ollama)** เปลี่ยน AI Coding Agent จาก *"สายพานโรงงานที่ผลิตโค้ดขยะ (Slop Factory)"* สู่ **"ครัวมิชลิน (Michelin Kitchen)"** ที่ตรวจสอบด้วยหลักฐานเชิงประจักษ์ 7 ด่าน
+
+---
+
+## 💻 รองรับ 4 ภาษาหลักแบบ Polyglot (`TypeScript`, `Python`, `Go`, `PHP`)
+
+ไม่ต้องกังวลว่าโปรเจกต์ของคุณจะเขียนด้วยภาษาอะไร `control-glass` v3.0 มี **Built-in Polyglot Engine (`src/harness/polyglot-engine.ts`)** ที่บังคับใช้กฎ Dune Linter, Deslop, Auto-Mapper และ SHA-256 TDD Lock ในทั้ง 4 ภาษาโดยไม่ต้องลงปลั๊กอินแยก:
+
+| มิติการควบคุม | 🟦 TypeScript (`.ts`) | 🐍 Python (`.py`) | 🐹 Go (`.go`) | 🐘 PHP (`.php`) |
+| :--- | :--- | :--- | :--- | :--- |
+| **Level 1: Branded Contracts** | `Brand<T, Name>` + `Result<T, E>` | `typing.NewType` + `@dataclass(frozen=True) Ok/Err` | Distinct Types (`type Satang int64`) + `(T, error)` | `final readonly class` + `declare(strict_types=1);` |
+| **No Comments (`DUNE_NO_COMMENTS`)** | บล็อก `//`, `/* */` | บล็อก `#`, `"""` | บล็อก `//`, `/* */` | บล็อก `//`, `#`, `/* */` |
+| **No Suppression (`DUNE_NO_LINTER_SUPPRESSION`)** | บล็อก `@ts-ignore`, `eslint-disable` | บล็อก `# type: ignore`, `# noqa` | บล็อก `//nolint` | บล็อก `@phpstan-ignore`, `@psalm-suppress` |
+| **No Weak Types (`DUNE_NO_EXPLICIT_ANY`)** | บล็อก `any`, `as unknown` | บล็อก `typing.Any` | บล็อก `interface{}`, `any` | บล็อก `mixed` & บังคับ `declare(strict_types=1);` |
+| **No Debug Output (`DUNE_NO_CONSOLE_IN_DOMAIN`)** | บล็อก `console.*` | บล็อก `print(...)` | บล็อก `fmt.Print*` | บล็อก `var_dump`, `dd`, `print_r`, `echo` |
+| **Deslop Engine (`npx control-glass deslop --fix`)** | ลบคอมเมนต์ + ดัก `catch {}` & `debugger` | ลบ `#` + ดัก `except: pass` & `breakpoint()` | ลบ `//` + ดัก `_ = err` | ลบ `//`, `#` + ดัก `catch (...) {}` & `xdebug_break()` |
+| **SHA-256 TDD Lock (`npx control-glass lock`)** | `*.spec.ts`, `*.test.ts`, `contracts.ts` | `test_*.py`, `*_test.py`, `contracts.py` | `*_test.go`, `contracts.go` | `*Test.php`, `Contracts.php` |
+
+สามารถสร้างไฟล์ตั้งต้น Branded Contracts สำหรับแต่ละภาษาได้ทันทีด้วย:
+```bash
+npx control-glass init --lang python   # สร้าง src/core/contracts.py
+npx control-glass init --lang go       # สร้าง src/core/contracts.go
+npx control-glass init --lang php      # สร้าง src/Core/Contracts.php
+npx control-glass init --lang all      # สร้างครบทุกภาษา
+```
 
 ---
 
@@ -49,6 +73,7 @@
 * 🧭 **[02 — Route Work Through `/control-glass-mode`](./docs/guide/02-control-glass-mode.md)**: วิธีใช้งาน `/control-glass-mode` ร่วมกับ `/arena`, `/interrogate`, `/deslop`, และ `/how-why`
 * 🛡️ **[03 — Dune Architecture & Verification Gates](./docs/guide/03-dune-and-guardrails.md)**: เจาะลึก Branded Contracts, กฎ AST Linter, SHA-256 TDD Lock และการคัดแยก Tier 0 / Tier 1 / Tier 2
 * 🌐 **[04 — Multi-Vendor AI Support (Claude, OpenAI, Gemini, Cursor, Copilot, MCP)](./docs/guide/04-multi-vendor-ai.md)**: วิธีเชื่อมต่อกับ AI ทุกค่ายและตั้งค่า MCP Server
+* 💻 **[05 — Polyglot Support (TypeScript, Python, Go, PHP)](./docs/guide/05-polyglot-support.md)**: คู่มือการใช้งานกับโปรเจกต์ Python, Go, และ PHP พร้อมตัวอย่าง Branded Contracts
 
 ---
 
@@ -132,7 +157,8 @@ export type OrderId = Brand<string, "OrderId">;
 
 | คำสั่ง CLI | คำสั่ง npm (ในโปรเจกต์นี้) | คำอธิบาย |
 | :--- | :--- | :--- |
-| `npx control-glass init` | `npm run cli -- init` | สร้าง `feature-map.json`, `AGENTS.md`, ซิงค์ไฟล์ทุก AI Vendor และสร้าง `.control-glass/tdd-lock.json` |
+| `npx control-glass init [--lang <ts\|python\|go\|php\|all>]` | `npm run cli -- init` | สร้าง `feature-map.json`, `AGENTS.md`, ซิงค์ไฟล์ทุก AI Vendor, สร้าง Contract Template ตามภาษา และล็อก TDD |
+| `npx control-glass languages` | `npm run cli -- languages` | ตรวจจับภาษาที่ใช้งานในโปรเจกต์อัตโนมัติ (`typescript`, `python`, `go`, `php`) |
 | `npx control-glass sync-vendors` | `npm run sync:vendors` | สร้างและอัปเดตไฟล์ตั้งค่าสำหรับ Claude (`CLAUDE.md`), OpenAI (`AGENTS.md`), Cursor, Copilot, Windsurf และ MCP |
 | `npx control-glass mcp` | `npm run mcp` | รัน Model Context Protocol (MCP) Server ผ่าน stdio ให้ AI ทุกค่ายเรียกใช้ด่านตรวจเป็น Native Tools |
 | `npx control-glass vendors` | `npm run cli -- vendors` | ตรวจสอบสถานะการตั้งค่า API ของ Anthropic Claude, OpenAI, Gemini และ Local Ollama |

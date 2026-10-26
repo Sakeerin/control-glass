@@ -52,7 +52,14 @@ function collectScannableFiles(dirPath: string): string[] {
     const full = path.join(dirPath, entry.name);
     if (entry.isDirectory()) {
       results.push(...collectScannableFiles(full));
-    } else if (entry.isFile() && (entry.name.endsWith(".ts") || entry.name.endsWith(".json"))) {
+    } else if (
+      entry.isFile() &&
+      (entry.name.endsWith(".ts") ||
+        entry.name.endsWith(".py") ||
+        entry.name.endsWith(".go") ||
+        entry.name.endsWith(".php") ||
+        entry.name.endsWith(".json"))
+    ) {
       results.push(full);
     }
   }
@@ -64,7 +71,13 @@ export function runSafetyGate(rootDir: string = process.cwd()): {
   readonly scannedFiles: number;
   readonly findings: readonly SafetyFinding[];
 } {
-  const targetDirs = [path.join(rootDir, "src"), path.join(rootDir, "tests")];
+  const targetDirs = [
+    path.join(rootDir, "src"),
+    path.join(rootDir, "app"),
+    path.join(rootDir, "pkg"),
+    path.join(rootDir, "internal"),
+    path.join(rootDir, "tests")
+  ];
   const files = targetDirs.flatMap((d) => collectScannableFiles(d));
   const findings: SafetyFinding[] = [];
 

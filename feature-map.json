@@ -77,6 +77,17 @@
       "tests": ["tests/multi-vendor.spec.ts"],
       "domOrUiSelectors": [],
       "verificationCommand": "npm run verify"
+    },
+    {
+      "id": "polyglot-language-engine",
+      "name": "Universal Polyglot Engine (TypeScript, Python, Go, PHP)",
+      "tier": "Tier 2",
+      "riskReason": "Enforces Dune Linter, Deslop, Auto-Mapper, and SHA-256 TDD Locks across .ts, .py, .go, and .php codebases.",
+      "entrypoints": ["src/harness/polyglot-engine.ts"],
+      "contracts": ["src/core/contracts.ts"],
+      "tests": ["tests/polyglot-engine.spec.ts"],
+      "domOrUiSelectors": [],
+      "verificationCommand": "npm run verify"
     }
   ]
 }

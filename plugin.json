@@ -1,8 +1,8 @@
 {
   "name": "control-glass",
   "displayName": "Control Glass",
-  "version": "2.1.0",
-  "description": "Universal Multi-Vendor Agentic Engineering Plugin, MCP Server & CLI (Claude, OpenAI, Gemini, Cursor, Copilot, Windsurf). Routes work through /control-glass-mode with AST Deslop, Auto-Mapper, SHA-256 TDD Locks, and Tiered Review.",
+  "version": "3.0.0",
+  "description": "Universal Polyglot (TypeScript, Python, Go, PHP) & Multi-Vendor AI Agentic Engineering Plugin, MCP Server & CLI. Enforces Dune Linter, Deslop, Auto-Mapper, SHA-256 TDD Locks, and Tiered Review.",
   "logo": "assets/logo.svg",
   "suggestedPrompts": [
     "Run /control-glass-mode to set up Control Glass guardrails and sync multi-vendor configs",

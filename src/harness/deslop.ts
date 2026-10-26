@@ -1,6 +1,12 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import {
+  collectPolyglotSourceFiles,
+  detectLanguageFromFile,
+  scanNonTsSlop,
+  stripNonTsComments
+} from "./polyglot-engine.js";
 
 export interface SlopIssue {
   readonly file: string;
@@ -9,7 +15,8 @@ export interface SlopIssue {
     | "COMMENT_SLOP"
     | "EMPTY_CATCH_BLOCK"
     | "TRIVIAL_PASS_THROUGH_WRAPPER"
-    | "DEBUG_LEFTOVER";
+    | "DEBUG_LEFTOVER"
+    | "SWALLOWED_ERROR_RESULT";
   readonly description: string;
 }
 
@@ -18,23 +25,6 @@ export interface DeslopReport {
   readonly scannedFiles: number;
   readonly cleanedCommentCount: number;
   readonly issues: readonly SlopIssue[];
-}
-
-function collectTsFiles(dirPath: string): string[] {
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries) {
-    const full = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...collectTsFiles(full));
-    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
-      files.push(full);
-    }
-  }
-  return files;
 }
 
 function stripCommentsFromText(sourceText: string): {
@@ -123,68 +113,95 @@ export function runDeslopEngine(
   rootDir: string = process.cwd(),
   autoFixComments: boolean = false
 ): DeslopReport {
-  const srcFiles = collectTsFiles(path.join(rootDir, "src"));
+  const allFiles = collectPolyglotSourceFiles(rootDir);
   const issues: SlopIssue[] = [];
   let cleanedCommentCount = 0;
 
-  for (const absPath of srcFiles) {
+  for (const absPath of allFiles) {
     const relPath = path.relative(rootDir, absPath).split(path.sep).join("/");
     const isHarness = relPath.startsWith("src/harness/");
+    const lang = detectLanguageFromFile(absPath);
     let content = fs.readFileSync(absPath, "utf8");
 
-    if (autoFixComments) {
-      const stripped = stripCommentsFromText(content);
-      if (stripped.removedCount > 0) {
-        fs.writeFileSync(absPath, stripped.cleanedText, "utf8");
-        content = stripped.cleanedText;
-        cleanedCommentCount += stripped.removedCount;
+    if (lang === "typescript") {
+      if (autoFixComments) {
+        const stripped = stripCommentsFromText(content);
+        if (stripped.removedCount > 0) {
+          fs.writeFileSync(absPath, stripped.cleanedText, "utf8");
+          content = stripped.cleanedText;
+          cleanedCommentCount += stripped.removedCount;
+        }
+      }
+
+      const sf = ts.createSourceFile(
+        relPath,
+        content,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS
+      );
+
+      const visit = (node: ts.Node): void => {
+        if (ts.isCatchClause(node) && node.block.statements.length === 0 && !isHarness) {
+          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+          issues.push({
+            file: relPath,
+            line,
+            kind: "EMPTY_CATCH_BLOCK",
+            description:
+              "Swallowing exceptions via an empty catch block is AI slop. Return an explicit err(...) Result."
+          });
+        }
+
+        if (ts.isDebuggerStatement(node)) {
+          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+          issues.push({
+            file: relPath,
+            line,
+            kind: "DEBUG_LEFTOVER",
+            description: "Leftover debugger statement detected."
+          });
+        }
+
+        if (ts.isFunctionDeclaration(node) && isTrivialPassThroughFunction(node)) {
+          const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+          const fnName = node.name?.text ?? "anonymous";
+          issues.push({
+            file: relPath,
+            line,
+            kind: "TRIVIAL_PASS_THROUGH_WRAPPER",
+            description: `Function '${fnName}' is a redundant 1-to-1 pass-through wrapper. Call the underlying function directly.`
+          });
+        }
+
+        ts.forEachChild(node, visit);
+      };
+
+      visit(sf);
+    } else if (lang === "python" || lang === "go" || lang === "php") {
+      if (autoFixComments) {
+        const stripped = stripNonTsComments(content, lang);
+        if (stripped.removedCount > 0) {
+          fs.writeFileSync(absPath, stripped.cleanedText, "utf8");
+          content = stripped.cleanedText;
+          cleanedCommentCount += stripped.removedCount;
+        }
+      }
+      const nonTsFindings = scanNonTsSlop(content, relPath, lang);
+      for (const f of nonTsFindings) {
+        issues.push({
+          file: f.file,
+          line: f.line,
+          kind: f.kind,
+          description: f.description
+        });
       }
     }
-
-    const sf = ts.createSourceFile(relPath, content, ts.ScriptTarget.Latest, true, ts.ScriptKind.TS);
-
-    const visit = (node: ts.Node): void => {
-      if (ts.isCatchClause(node) && node.block.statements.length === 0 && !isHarness) {
-        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-        issues.push({
-          file: relPath,
-          line,
-          kind: "EMPTY_CATCH_BLOCK",
-          description:
-            "Swallowing exceptions via an empty catch block is AI slop. Return an explicit err(...) Result."
-        });
-      }
-
-      if (ts.isDebuggerStatement(node)) {
-        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-        issues.push({
-          file: relPath,
-          line,
-          kind: "DEBUG_LEFTOVER",
-          description: "Leftover debugger statement detected."
-        });
-      }
-
-      if (ts.isFunctionDeclaration(node) && isTrivialPassThroughFunction(node)) {
-        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
-        const fnName = node.name?.text ?? "anonymous";
-        issues.push({
-          file: relPath,
-          line,
-          kind: "TRIVIAL_PASS_THROUGH_WRAPPER",
-          description: `Function '${fnName}' is a redundant 1-to-1 pass-through wrapper. Call the underlying function directly.`
-        });
-      }
-
-      ts.forEachChild(node, visit);
-    };
-
-    visit(sf);
   }
 
   return {
     passed: issues.length === 0,
-    scannedFiles: srcFiles.length,
+    scannedFiles: allFiles.length,
     cleanedCommentCount,
     issues
   };

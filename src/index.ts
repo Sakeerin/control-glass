@@ -71,4 +71,16 @@ export {
   buildVendorRequestPayload,
   detectAvailableVendors
 } from "./vendors/llm-gateway.js";
+export {
+  type SupportedLanguage,
+  type PolyglotViolation,
+  type PolyglotSlopFinding,
+  detectLanguageFromFile,
+  detectProjectLanguages,
+  collectPolyglotSourceFiles,
+  lintNonTsSourceText,
+  scanNonTsSlop,
+  stripNonTsComments,
+  POLYGLOT_CONTRACT_TEMPLATES
+} from "./harness/polyglot-engine.js";
 export { initControlGlassProject } from "./harness/cli.js";

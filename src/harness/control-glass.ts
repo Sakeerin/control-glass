@@ -5,12 +5,14 @@ import { buildDependencyGraph } from "./auto-mapper.js";
 import { runDeslopEngine } from "./deslop.js";
 import { analyzeDiffAndTier, type DiffReviewReport } from "./diff-reviewer.js";
 import { runDuneLinter } from "./dune-linter.js";
+import { detectProjectLanguages, type SupportedLanguage } from "./polyglot-engine.js";
 import { runSafetyGate } from "./safety-gate.js";
 import { verifyTddLock } from "./tdd-guard.js";
 
 export interface EmpiricalEvidenceArtifact {
   readonly timestamp: string;
   readonly durationMs: number;
+  readonly detectedLanguages: readonly SupportedLanguage[];
   readonly overallPassed: boolean;
   readonly gates: {
     readonly typecheck: { readonly passed: boolean; readonly output: string };
@@ -63,12 +65,18 @@ function runCommandGate(command: string, cwd: string): { passed: boolean; output
 
 export function runControlGlass(rootDir: string = process.cwd()): EmpiricalEvidenceArtifact {
   const startTime = performance.now();
+  const detectedLanguages = detectProjectLanguages(rootDir);
 
-  console.log("🔬 [Control Glass] Starting Empirical Verification Pipeline...\n");
-
-  const typecheckRes = runCommandGate("npx tsc --noEmit", rootDir);
   console.log(
-    `  1. [Level 1] Strict TypeScript Compiler: ${typecheckRes.passed ? "✅ PASS" : "❌ FAIL"}`
+    `🔬 [Control Glass] Starting Polyglot Empirical Verification Pipeline (${detectedLanguages.join(", ") || "typescript"})...\n`
+  );
+
+  const hasTsConfig = fs.existsSync(path.join(rootDir, "tsconfig.json"));
+  const typecheckRes = hasTsConfig
+    ? runCommandGate("npx tsc --noEmit", rootDir)
+    : { passed: true, output: "No tsconfig.json; skipped tsc" };
+  console.log(
+    `  1. [Level 1] Static Compiler & Contract Check: ${typecheckRes.passed ? "✅ PASS" : "❌ FAIL"}`
   );
 
   const duneRes = runDuneLinter(rootDir);
@@ -115,6 +123,7 @@ export function runControlGlass(rootDir: string = process.cwd()): EmpiricalEvide
   const artifact: EmpiricalEvidenceArtifact = {
     timestamp: new Date().toISOString(),
     durationMs,
+    detectedLanguages,
     overallPassed,
     gates: {
       typecheck: typecheckRes,

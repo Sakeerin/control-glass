@@ -1,6 +1,11 @@
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import {
+  collectPolyglotSourceFiles,
+  detectLanguageFromFile,
+  lintNonTsSourceText
+} from "./polyglot-engine.js";
 
 export interface LintViolation {
   readonly file: string;
@@ -11,7 +16,8 @@ export interface LintViolation {
     | "DUNE_BOUNDARY_VIOLATION"
     | "DUNE_NO_EXPLICIT_ANY"
     | "DUNE_NO_TYPE_ASSERTION_ESCAPE"
-    | "DUNE_NO_CONSOLE_IN_DOMAIN";
+    | "DUNE_NO_CONSOLE_IN_DOMAIN"
+    | "DUNE_PHP_STRICT_TYPES_REQUIRED";
   readonly message: string;
 }
 
@@ -54,23 +60,6 @@ function loadBoundariesSafe(rootDir: string): Record<string, BoundaryConfig> {
   } catch {
     return DEFAULT_BOUNDARIES;
   }
-}
-
-function collectTypeScriptFiles(dirPath: string): string[] {
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries) {
-    const fullPath = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...collectTypeScriptFiles(fullPath));
-    } else if (entry.isFile() && entry.name.endsWith(".ts")) {
-      files.push(fullPath);
-    }
-  }
-  return files;
 }
 
 function getLineNumber(sourceFile: ts.SourceFile, pos: number): number {
@@ -246,27 +235,33 @@ export function runDuneLinter(rootDir: string = process.cwd()): {
   readonly violations: readonly LintViolation[];
 } {
   const boundaries = loadBoundariesSafe(rootDir);
-  const srcFiles = collectTypeScriptFiles(path.join(rootDir, "src"));
+  const allFiles = collectPolyglotSourceFiles(rootDir);
   const violations: LintViolation[] = [];
 
-  for (const filePath of srcFiles) {
+  for (const filePath of allFiles) {
     const relativePath = path.relative(rootDir, filePath).split(path.sep).join("/");
     const content = fs.readFileSync(filePath, "utf8");
-    const sourceFile = ts.createSourceFile(
-      relativePath,
-      content,
-      ts.ScriptTarget.Latest,
-      true,
-      ts.ScriptKind.TS
-    );
+    const lang = detectLanguageFromFile(filePath);
 
-    violations.push(...checkNoComments(sourceFile, relativePath));
-    violations.push(...checkAstRules(sourceFile, relativePath, boundaries));
+    if (lang === "typescript") {
+      const sourceFile = ts.createSourceFile(
+        relativePath,
+        content,
+        ts.ScriptTarget.Latest,
+        true,
+        ts.ScriptKind.TS
+      );
+
+      violations.push(...checkNoComments(sourceFile, relativePath));
+      violations.push(...checkAstRules(sourceFile, relativePath, boundaries));
+    } else if (lang === "python" || lang === "go" || lang === "php") {
+      violations.push(...lintNonTsSourceText(content, relativePath, lang, boundaries));
+    }
   }
 
   return {
     passed: violations.length === 0,
-    checkedFiles: srcFiles.length,
+    checkedFiles: allFiles.length,
     violations
   };
 }

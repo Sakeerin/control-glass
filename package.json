@@ -1,8 +1,8 @@
 {
   "name": "control-glass",
-  "version": "2.2.0",
+  "version": "3.0.0",
   "license": "MIT",
-  "description": "Universal Multi-Vendor Agentic Engineering Plugin, MCP Server & CLI (Claude, OpenAI Codex/GPT, Gemini, Cursor, Copilot, Windsurf)",
+  "description": "Universal Polyglot (TypeScript, Python, Go, PHP) & Multi-Vendor AI Agentic Engineering Plugin, MCP Server & CLI",
   "type": "module",
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",

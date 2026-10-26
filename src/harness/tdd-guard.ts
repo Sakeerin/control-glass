@@ -30,14 +30,22 @@ function collectFilesRecursive(
 
 function collectLockedFiles(rootDir: string): string[] {
   const isSpecOrContract = (name: string): boolean =>
-    name.endsWith(".spec.ts") || name.endsWith(".test.ts") || name.endsWith(".contract.ts");
+    name.endsWith(".spec.ts") ||
+    name.endsWith(".test.ts") ||
+    name.endsWith(".contract.ts") ||
+    name.endsWith("_test.py") ||
+    (name.startsWith("test_") && name.endsWith(".py")) ||
+    name.endsWith("_test.go") ||
+    name.endsWith("Test.php") ||
+    name === "contracts.py" ||
+    name === "contracts.go" ||
+    name === "Contracts.php";
 
   const files = new Set<string>();
-  for (const f of collectFilesRecursive(path.join(rootDir, "tests"), isSpecOrContract)) {
-    files.add(f);
-  }
-  for (const f of collectFilesRecursive(path.join(rootDir, "src"), isSpecOrContract)) {
-    files.add(f);
+  for (const dir of ["tests", "src", "app", "pkg", "internal"]) {
+    for (const f of collectFilesRecursive(path.join(rootDir, dir), isSpecOrContract)) {
+      files.add(f);
+    }
   }
 
   const coreContract = path.join(rootDir, "src/core/contracts.ts");

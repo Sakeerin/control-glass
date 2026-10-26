@@ -14,6 +14,11 @@ import { analyzeDiffAndTier } from "./diff-reviewer.js";
 import { runDuneLinter } from "./dune-linter.js";
 import { installGitAndCiHooks } from "./hook-installer.js";
 import { startMcpStdioServer } from "./mcp-server.js";
+import {
+  POLYGLOT_CONTRACT_TEMPLATES,
+  detectProjectLanguages,
+  type SupportedLanguage
+} from "./polyglot-engine.js";
 import { runSafetyGate } from "./safety-gate.js";
 import { verifyTddLock, writeTddLockManifest } from "./tdd-guard.js";
 import { syncVendorConfigs } from "./vendor-sync.js";
@@ -66,7 +71,10 @@ const DEFAULT_AGENTS_MD = `# AGENTS.md — Control Glass (Michelin Kitchen & Bot
 5. **Anti-Closed-Loop Testing (TDD Lock):** Never modify locked test files in \`tests/\` to make broken code pass.
 `;
 
-export function initControlGlassProject(targetDir: string = process.cwd()): {
+export function initControlGlassProject(
+  targetDir: string = process.cwd(),
+  requestedLang?: SupportedLanguage | "all"
+): {
   readonly createdFiles: readonly string[];
 } {
   const created: string[] = [];
@@ -80,6 +88,36 @@ export function initControlGlassProject(targetDir: string = process.cwd()): {
   if (!fs.existsSync(agentsMdPath)) {
     fs.writeFileSync(agentsMdPath, DEFAULT_AGENTS_MD, "utf8");
     created.push("AGENTS.md");
+  }
+
+  if (requestedLang === "python" || requestedLang === "all") {
+    const pyTemplate = POLYGLOT_CONTRACT_TEMPLATES.python;
+    const pyPath = path.join(targetDir, pyTemplate.targetPath);
+    if (!fs.existsSync(pyPath)) {
+      fs.mkdirSync(path.dirname(pyPath), { recursive: true });
+      fs.writeFileSync(pyPath, pyTemplate.content, "utf8");
+      created.push(pyTemplate.targetPath);
+    }
+  }
+
+  if (requestedLang === "go" || requestedLang === "all") {
+    const goTemplate = POLYGLOT_CONTRACT_TEMPLATES.go;
+    const goPath = path.join(targetDir, goTemplate.targetPath);
+    if (!fs.existsSync(goPath)) {
+      fs.mkdirSync(path.dirname(goPath), { recursive: true });
+      fs.writeFileSync(goPath, goTemplate.content, "utf8");
+      created.push(goTemplate.targetPath);
+    }
+  }
+
+  if (requestedLang === "php" || requestedLang === "all") {
+    const phpTemplate = POLYGLOT_CONTRACT_TEMPLATES.php;
+    const phpPath = path.join(targetDir, phpTemplate.targetPath);
+    if (!fs.existsSync(phpPath)) {
+      fs.mkdirSync(path.dirname(phpPath), { recursive: true });
+      fs.writeFileSync(phpPath, phpTemplate.content, "utf8");
+      created.push(phpTemplate.targetPath);
+    }
   }
 
   const vendorReport = syncVendorConfigs(targetDir);
@@ -122,8 +160,19 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
 
   switch (cmd) {
     case "init": {
-      const res = initControlGlassProject(cwd);
+      const langFlagIdx = process.argv.indexOf("--lang");
+      const langVal =
+        langFlagIdx !== -1
+          ? (process.argv[langFlagIdx + 1] as SupportedLanguage | "all" | undefined)
+          : undefined;
+      const res = initControlGlassProject(cwd, langVal);
       console.log(`✅ Control Glass initialized (${res.createdFiles.length} files configured).`);
+      break;
+    }
+    case "languages": {
+      const langs = detectProjectLanguages(cwd);
+      console.log(`🌐 Detected Project Languages: ${langs.join(", ")}`);
+      console.log("  Supported Polyglot Engines: typescript (.ts/.tsx), python (.py), go (.go), php (.php)");
       break;
     }
     case "sync-vendors": {
