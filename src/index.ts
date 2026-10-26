@@ -45,8 +45,10 @@ export {
 } from "./harness/deslop.js";
 export {
   runPerformanceBenchmark,
+  measureWorkload,
   type BenchmarkMetric,
-  type BenchmarkSuiteReport
+  type BenchmarkSuiteReport,
+  type CustomBenchmarkTask
 } from "./harness/bench.js";
 export { installGitAndCiHooks } from "./harness/hook-installer.js";
 export {

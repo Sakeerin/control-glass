@@ -15,7 +15,7 @@ export interface FeatureEntry {
 }
 
 interface FeatureMapDoc {
-  readonly features: readonly FeatureEntry[];
+  readonly features?: readonly FeatureEntry[];
 }
 
 export interface DiffReviewReport {
@@ -36,6 +36,19 @@ const TIER_WEIGHT: Record<ReviewTier, number> = {
   "Tier 2": 2
 };
 
+function loadFeaturesSafe(rootDir: string): readonly FeatureEntry[] {
+  const featureMapPath = path.join(rootDir, "feature-map.json");
+  if (!fs.existsSync(featureMapPath)) {
+    return [];
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(featureMapPath, "utf8")) as FeatureMapDoc;
+    return parsed.features ?? [];
+  } catch {
+    return [];
+  }
+}
+
 function getChangedFilesFromGit(rootDir: string): string[] {
   try {
     const statusOut = execSync("git status --porcelain -uall", {
@@ -43,10 +56,24 @@ function getChangedFilesFromGit(rootDir: string): string[] {
       encoding: "utf8",
       stdio: ["ignore", "pipe", "ignore"]
     });
-    const lines = statusOut
+    const workingLines = statusOut
       .split(/\r?\n/)
-      .filter((l) => l.trim().length > 0);
-    return lines.map((line) => line.slice(3).trim().replace(/\\/g, "/"));
+      .filter((l) => l.trim().length > 0)
+      .map((line) => line.slice(3).trim().replace(/\\/g, "/"));
+
+    if (workingLines.length > 0) {
+      return workingLines;
+    }
+
+    const headDiffOut = execSync("git diff --name-only HEAD~1 HEAD", {
+      cwd: rootDir,
+      encoding: "utf8",
+      stdio: ["ignore", "pipe", "ignore"]
+    });
+    return headDiffOut
+      .split(/\r?\n/)
+      .map((l) => l.trim().replace(/\\/g, "/"))
+      .filter((l) => l.length > 0);
   } catch {
     return [];
   }
@@ -56,8 +83,7 @@ export function analyzeDiffAndTier(
   rootDir: string = process.cwd(),
   explicitChangedFiles?: readonly string[]
 ): DiffReviewReport {
-  const featureMapPath = path.join(rootDir, "feature-map.json");
-  const featureMap = JSON.parse(fs.readFileSync(featureMapPath, "utf8")) as FeatureMapDoc;
+  const features = loadFeaturesSafe(rootDir);
   const changedFiles = explicitChangedFiles ?? getChangedFilesFromGit(rootDir);
 
   let highestTier: ReviewTier = "Tier 0";
@@ -67,7 +93,7 @@ export function analyzeDiffAndTier(
     if (file.startsWith("src/core/") || file.startsWith("src/harness/")) {
       highestTier = "Tier 2";
     }
-    for (const feature of featureMap.features) {
+    for (const feature of features) {
       const allFeatureFiles = [...feature.entrypoints, ...feature.contracts, ...feature.tests];
       if (allFeatureFiles.includes(file)) {
         if (!impacted.some((i) => i.id === feature.id)) {
@@ -112,7 +138,10 @@ export function analyzeDiffAndTier(
 if (process.argv[1]?.endsWith("diff-reviewer.ts")) {
   const report = analyzeDiffAndTier();
   console.log("🔍 Diff & Consequence Review Orchestrator (Phase 3):");
-  console.log(`  Changed Files (${report.changedFiles.length}):`, report.changedFiles.join(", ") || "None (Clean working tree)");
+  console.log(
+    `  Changed Files (${report.changedFiles.length}):`,
+    report.changedFiles.join(", ") || "None (Clean working tree)"
+  );
   console.log(`  Impacted Features (${report.impactedFeatures.length}):`);
   for (const feat of report.impactedFeatures) {
     console.log(`    - [${feat.tier}] ${feat.name}: ${feat.riskReason}`);

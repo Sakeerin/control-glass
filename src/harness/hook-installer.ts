@@ -3,7 +3,11 @@ import path from "node:path";
 
 const PRE_COMMIT_HOOK_SCRIPT = `#!/bin/sh
 echo "🔬 [Control Glass] Running pre-commit verification gate..."
-npm run verify
+if [ -f "src/harness/control-glass.ts" ]; then
+  npx tsx src/harness/control-glass.ts
+else
+  npx control-glass verify
+fi
 `;
 
 const GITHUB_ACTIONS_WORKFLOW = `name: Control Glass Verification Gate
@@ -20,6 +24,8 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Setup Node.js 22
         uses: actions/setup-node@v4
@@ -30,14 +36,11 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
-      - name: Run Control Glass 6-Gate Pipeline
+      - name: Run Control Glass Pipeline
         run: npm run verify
 
-      - name: Run Deslop & AST Dependency Mapper
-        run: |
-          npx tsx src/harness/deslop.ts
-          npx tsx src/harness/auto-mapper.ts
-          npx tsx src/harness/bench.ts
+      - name: Run Empirical Performance Benchmark
+        run: npm run bench
 `;
 
 export function installGitAndCiHooks(rootDir: string = process.cwd()): {

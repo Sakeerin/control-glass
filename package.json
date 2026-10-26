@@ -1,6 +1,7 @@
 {
   "name": "control-glass",
-  "version": "2.1.0",
+  "version": "2.2.0",
+  "license": "MIT",
   "description": "Universal Multi-Vendor Agentic Engineering Plugin, MCP Server & CLI (Claude, OpenAI Codex/GPT, Gemini, Cursor, Copilot, Windsurf)",
   "type": "module",
   "main": "./dist/index.js",
@@ -25,9 +26,11 @@
     "mcp_config.json",
     "AGENTS.md",
     "CLAUDE.md",
-    "README.md"
+    "README.md",
+    "LICENSE"
   ],
   "scripts": {
+    "prepack": "npm run build",
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc --noEmit",
     "lint:dune": "tsx src/harness/dune-linter.ts",

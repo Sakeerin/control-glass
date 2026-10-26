@@ -7,6 +7,7 @@ export interface LintViolation {
   readonly line: number;
   readonly ruleId:
     | "DUNE_NO_COMMENTS"
+    | "DUNE_NO_LINTER_SUPPRESSION"
     | "DUNE_BOUNDARY_VIOLATION"
     | "DUNE_NO_EXPLICIT_ANY"
     | "DUNE_NO_TYPE_ASSERTION_ESCAPE"
@@ -21,7 +22,38 @@ interface BoundaryConfig {
 }
 
 interface FeatureMapSchema {
-  readonly architecturalBoundaries: Record<string, BoundaryConfig>;
+  readonly architecturalBoundaries?: Record<string, BoundaryConfig>;
+}
+
+const DEFAULT_BOUNDARIES: Record<string, BoundaryConfig> = {
+  ui: {
+    pathPrefix: "src/ui/",
+    forbiddenImports: ["src/infra/", "node:fs", "node:child_process", "fs", "child_process"],
+    description: "Renderer / Presentation layer"
+  },
+  features: {
+    pathPrefix: "src/features/",
+    forbiddenImports: ["node:child_process", "child_process"],
+    description: "Single Paved Path domain features"
+  },
+  core: {
+    pathPrefix: "src/core/",
+    forbiddenImports: ["src/ui/", "src/features/"],
+    description: "Foundational Branded Types and contracts"
+  }
+};
+
+function loadBoundariesSafe(rootDir: string): Record<string, BoundaryConfig> {
+  const featureMapPath = path.join(rootDir, "feature-map.json");
+  if (!fs.existsSync(featureMapPath)) {
+    return DEFAULT_BOUNDARIES;
+  }
+  try {
+    const parsed = JSON.parse(fs.readFileSync(featureMapPath, "utf8")) as FeatureMapSchema;
+    return parsed.architecturalBoundaries ?? DEFAULT_BOUNDARIES;
+  } catch {
+    return DEFAULT_BOUNDARIES;
+  }
 }
 
 function collectTypeScriptFiles(dirPath: string): string[] {
@@ -63,12 +95,17 @@ function checkNoComments(sourceFile: ts.SourceFile, relativePath: string): LintV
       token === ts.SyntaxKind.MultiLineCommentTrivia
     ) {
       const startPos = scanner.getTokenPos();
+      const commentText = scanner.getTokenText();
+      const isSuppression = /(@ts-ignore|@ts-expect-error|@ts-nocheck|eslint-disable)/.test(
+        commentText
+      );
       violations.push({
         file: relativePath,
         line: getLineNumber(sourceFile, startPos),
-        ruleId: "DUNE_NO_COMMENTS",
-        message:
-          "Comments are strictly prohibited in Dune codebase. Do not leave band-aid explanations; use expressive types and function names."
+        ruleId: isSuppression ? "DUNE_NO_LINTER_SUPPRESSION" : "DUNE_NO_COMMENTS",
+        message: isSuppression
+          ? "Compiler or linter suppression directives (@ts-ignore, @ts-expect-error, eslint-disable) are strictly forbidden."
+          : "Comments are strictly prohibited in Dune codebase. Do not leave band-aid explanations; use expressive types and function names."
       });
     }
     token = scanner.scan();
@@ -82,6 +119,31 @@ function resolveRelativeImportTarget(importerRelativePath: string, moduleSpecifi
   }
   const importerDir = path.posix.dirname(importerRelativePath);
   return path.posix.normalize(path.posix.join(importerDir, moduleSpecifier));
+}
+
+function checkModuleSpecifierAgainstBoundaries(
+  sourceFile: ts.SourceFile,
+  nodePos: number,
+  relativePath: string,
+  rawSpec: string,
+  boundaries: Record<string, BoundaryConfig>,
+  violations: LintViolation[]
+): void {
+  const resolvedTarget = resolveRelativeImportTarget(relativePath, rawSpec);
+  for (const boundary of Object.values(boundaries)) {
+    if (relativePath.startsWith(boundary.pathPrefix)) {
+      for (const forbidden of boundary.forbiddenImports) {
+        if (rawSpec === forbidden || resolvedTarget.startsWith(forbidden)) {
+          violations.push({
+            file: relativePath,
+            line: getLineNumber(sourceFile, nodePos),
+            ruleId: "DUNE_BOUNDARY_VIOLATION",
+            message: `Boundary lock violated: '${relativePath}' (${boundary.pathPrefix}) cannot import '${rawSpec}' (matches forbidden '${forbidden}').`
+          });
+        }
+      }
+    }
+  }
 }
 
 function checkAstRules(
@@ -129,22 +191,45 @@ function checkAstRules(
     }
 
     if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      const rawSpec = node.moduleSpecifier.text;
-      const resolvedTarget = resolveRelativeImportTarget(relativePath, rawSpec);
+      checkModuleSpecifierAgainstBoundaries(
+        sourceFile,
+        node.getStart(sourceFile),
+        relativePath,
+        node.moduleSpecifier.text,
+        boundaries,
+        violations
+      );
+    }
 
-      for (const boundary of Object.values(boundaries)) {
-        if (relativePath.startsWith(boundary.pathPrefix)) {
-          for (const forbidden of boundary.forbiddenImports) {
-            if (rawSpec === forbidden || resolvedTarget.startsWith(forbidden)) {
-              violations.push({
-                file: relativePath,
-                line: getLineNumber(sourceFile, node.getStart(sourceFile)),
-                ruleId: "DUNE_BOUNDARY_VIOLATION",
-                message: `Boundary lock violated: '${relativePath}' (${boundary.pathPrefix}) cannot import '${rawSpec}' (matches forbidden '${forbidden}').`
-              });
-            }
-          }
-        }
+    if (
+      ts.isExportDeclaration(node) &&
+      node.moduleSpecifier &&
+      ts.isStringLiteral(node.moduleSpecifier)
+    ) {
+      checkModuleSpecifierAgainstBoundaries(
+        sourceFile,
+        node.getStart(sourceFile),
+        relativePath,
+        node.moduleSpecifier.text,
+        boundaries,
+        violations
+      );
+    }
+
+    if (ts.isCallExpression(node) && node.arguments.length >= 1) {
+      const firstArg = node.arguments[0];
+      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
+      const isRequireCall =
+        ts.isIdentifier(node.expression) && node.expression.text === "require";
+      if ((isDynamicImport || isRequireCall) && firstArg && ts.isStringLiteral(firstArg)) {
+        checkModuleSpecifierAgainstBoundaries(
+          sourceFile,
+          node.getStart(sourceFile),
+          relativePath,
+          firstArg.text,
+          boundaries,
+          violations
+        );
       }
     }
 
@@ -160,8 +245,7 @@ export function runDuneLinter(rootDir: string = process.cwd()): {
   readonly checkedFiles: number;
   readonly violations: readonly LintViolation[];
 } {
-  const featureMapPath = path.join(rootDir, "feature-map.json");
-  const featureMap = JSON.parse(fs.readFileSync(featureMapPath, "utf8")) as FeatureMapSchema;
+  const boundaries = loadBoundariesSafe(rootDir);
   const srcFiles = collectTypeScriptFiles(path.join(rootDir, "src"));
   const violations: LintViolation[] = [];
 
@@ -177,9 +261,7 @@ export function runDuneLinter(rootDir: string = process.cwd()): {
     );
 
     violations.push(...checkNoComments(sourceFile, relativePath));
-    violations.push(
-      ...checkAstRules(sourceFile, relativePath, featureMap.architecturalBoundaries)
-    );
+    violations.push(...checkAstRules(sourceFile, relativePath, boundaries));
   }
 
   return {
@@ -189,7 +271,10 @@ export function runDuneLinter(rootDir: string = process.cwd()): {
   };
 }
 
-if (import.meta.url === `file://${path.resolve(process.argv[1] ?? "").replace(/\\/g, "/")}` || process.argv[1]?.endsWith("dune-linter.ts")) {
+if (
+  import.meta.url === `file://${path.resolve(process.argv[1] ?? "").replace(/\\/g, "/")}` ||
+  process.argv[1]?.endsWith("dune-linter.ts")
+) {
   const result = runDuneLinter();
   if (!result.passed) {
     console.error(`❌ Dune AST Linter failed with ${result.violations.length} violation(s):`);

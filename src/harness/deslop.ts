@@ -93,6 +93,32 @@ function stripCommentsFromText(sourceText: string): {
   };
 }
 
+function isTrivialPassThroughFunction(node: ts.FunctionDeclaration): boolean {
+  if (!node.body || node.body.statements.length !== 1 || node.parameters.length === 0) {
+    return false;
+  }
+  const stmt = node.body.statements[0];
+  if (!stmt || !ts.isReturnStatement(stmt) || !stmt.expression) {
+    return false;
+  }
+  if (!ts.isCallExpression(stmt.expression)) {
+    return false;
+  }
+  const callExpr = stmt.expression;
+  if (callExpr.arguments.length !== node.parameters.length) {
+    return false;
+  }
+  return node.parameters.every((param, idx) => {
+    const arg = callExpr.arguments[idx];
+    return (
+      ts.isIdentifier(param.name) &&
+      arg !== undefined &&
+      ts.isIdentifier(arg) &&
+      param.name.text === arg.text
+    );
+  });
+}
+
 export function runDeslopEngine(
   rootDir: string = process.cwd(),
   autoFixComments: boolean = false
@@ -136,6 +162,17 @@ export function runDeslopEngine(
           line,
           kind: "DEBUG_LEFTOVER",
           description: "Leftover debugger statement detected."
+        });
+      }
+
+      if (ts.isFunctionDeclaration(node) && isTrivialPassThroughFunction(node)) {
+        const line = sf.getLineAndCharacterOfPosition(node.getStart(sf)).line + 1;
+        const fnName = node.name?.text ?? "anonymous";
+        issues.push({
+          file: relPath,
+          line,
+          kind: "TRIVIAL_PASS_THROUGH_WRAPPER",
+          description: `Function '${fnName}' is a redundant 1-to-1 pass-through wrapper. Call the underlying function directly.`
         });
       }
 

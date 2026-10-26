@@ -9,21 +9,43 @@ export interface TddLockManifest {
 
 const LOCK_FILE_REL_PATH = ".control-glass/tdd-lock.json";
 
-function collectLockedFiles(rootDir: string): string[] {
-  const testsDir = path.join(rootDir, "tests");
-  const files: string[] = [];
-  if (fs.existsSync(testsDir)) {
-    for (const entry of fs.readdirSync(testsDir, { withFileTypes: true })) {
-      if (entry.isFile() && entry.name.endsWith(".spec.ts")) {
-        files.push(path.join(testsDir, entry.name));
-      }
+function collectFilesRecursive(
+  dirPath: string,
+  predicate: (fileName: string) => boolean
+): string[] {
+  if (!fs.existsSync(dirPath)) {
+    return [];
+  }
+  const results: string[] = [];
+  for (const entry of fs.readdirSync(dirPath, { withFileTypes: true })) {
+    const full = path.join(dirPath, entry.name);
+    if (entry.isDirectory()) {
+      results.push(...collectFilesRecursive(full, predicate));
+    } else if (entry.isFile() && predicate(entry.name)) {
+      results.push(full);
     }
   }
+  return results;
+}
+
+function collectLockedFiles(rootDir: string): string[] {
+  const isSpecOrContract = (name: string): boolean =>
+    name.endsWith(".spec.ts") || name.endsWith(".test.ts") || name.endsWith(".contract.ts");
+
+  const files = new Set<string>();
+  for (const f of collectFilesRecursive(path.join(rootDir, "tests"), isSpecOrContract)) {
+    files.add(f);
+  }
+  for (const f of collectFilesRecursive(path.join(rootDir, "src"), isSpecOrContract)) {
+    files.add(f);
+  }
+
   const coreContract = path.join(rootDir, "src/core/contracts.ts");
   if (fs.existsSync(coreContract)) {
-    files.push(coreContract);
+    files.add(coreContract);
   }
-  return files;
+
+  return Array.from(files);
 }
 
 function sha256File(filePath: string): string {

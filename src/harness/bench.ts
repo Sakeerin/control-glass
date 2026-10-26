@@ -25,7 +25,14 @@ export interface BenchmarkSuiteReport {
   readonly metrics: readonly BenchmarkMetric[];
 }
 
-function measureWorkload(
+export interface CustomBenchmarkTask {
+  readonly name: string;
+  readonly iterations?: number;
+  readonly maxAllowedDurationMs?: number;
+  readonly fn: () => void;
+}
+
+export function measureWorkload(
   name: string,
   iterations: number,
   maxAllowedDurationMs: number,
@@ -53,47 +60,65 @@ function measureWorkload(
   };
 }
 
-export function runPerformanceBenchmark(rootDir: string = process.cwd()): BenchmarkSuiteReport {
-  const imperialSample = createPoundForceSeconds(250);
-  const accId = createNonEmptyText("ACC-BENCH");
-  const initialBal = createSatang(10_000_000);
-  const debitAmt = createSatang(100);
-  const txKey = createIdempotencyKey("tx-bench-key-00001");
+export function runPerformanceBenchmark(
+  rootDir: string = process.cwd(),
+  customTasks?: readonly CustomBenchmarkTask[]
+): BenchmarkSuiteReport {
+  const metrics: BenchmarkMetric[] = [];
 
-  const thrusterMetric = measureWorkload(
-    "Orbital Impulse Conversion (10,000 ops)",
-    10_000,
-    500,
-    () => {
-      if (imperialSample.ok) {
-        convertPoundForceToNewtonSeconds(imperialSample.value);
-      }
-      createNewtonSeconds(444.82);
+  if (customTasks && customTasks.length > 0) {
+    for (const task of customTasks) {
+      metrics.push(
+        measureWorkload(
+          task.name,
+          task.iterations ?? 10_000,
+          task.maxAllowedDurationMs ?? 500,
+          task.fn
+        )
+      );
     }
-  );
+  } else {
+    const imperialSample = createPoundForceSeconds(250);
+    const accId = createNonEmptyText("ACC-BENCH");
+    const initialBal = createSatang(10_000_000);
+    const debitAmt = createSatang(100);
+    const txKey = createIdempotencyKey("tx-bench-key-00001");
 
-  const ledgerMetric = measureWorkload(
-    "Precision Ledger Settlement & Idempotency (10,000 ops)",
-    10_000,
-    800,
-    () => {
-      if (accId.ok && initialBal.ok && debitAmt.ok && txKey.ok) {
-        applySettlementDebit(
-          {
-            accountId: accId.value,
-            balanceSatang: initialBal.value,
-            processedKeys: new Set()
-          },
-          {
-            idempotencyKey: txKey.value,
-            debitAmount: debitAmt.value
+    metrics.push(
+      measureWorkload(
+        "Orbital Impulse Conversion (10,000 ops)",
+        10_000,
+        500,
+        () => {
+          if (imperialSample.ok) {
+            convertPoundForceToNewtonSeconds(imperialSample.value);
           }
-        );
-      }
-    }
-  );
+          createNewtonSeconds(444.82);
+        }
+      ),
+      measureWorkload(
+        "Precision Ledger Settlement & Idempotency (10,000 ops)",
+        10_000,
+        800,
+        () => {
+          if (accId.ok && initialBal.ok && debitAmt.ok && txKey.ok) {
+            applySettlementDebit(
+              {
+                accountId: accId.value,
+                balanceSatang: initialBal.value,
+                processedKeys: new Set()
+              },
+              {
+                idempotencyKey: txKey.value,
+                debitAmount: debitAmt.value
+              }
+            );
+          }
+        }
+      )
+    );
+  }
 
-  const metrics = [thrusterMetric, ledgerMetric];
   const overallPassed = metrics.every((m) => m.passedSla);
 
   const report: BenchmarkSuiteReport = {

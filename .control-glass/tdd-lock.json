@@ -1,8 +1,8 @@
 {
-  "updatedAt": "2026-10-24T07:17:24.778Z",
+  "updatedAt": "2026-10-26T08:01:48.028Z",
   "files": {
     "tests/canary-gate.spec.ts": "51c7d7001169af007ff359167c8bcfcc6eac6bc76bcc53dde1884e698dc37302",
-    "tests/harness-guardrails.spec.ts": "2464a84ef8996606a0245d7bfadaf345b081fba32e690696200aea2bf751ae71",
+    "tests/harness-guardrails.spec.ts": "4d8a046629f0053ed98555312d218faa6b4aa2b5fbf9bd33fc6570276d0843a7",
     "tests/impulse-calculator.spec.ts": "9c64e8bfa484a9c38f840c045ed8ee1f86ae67c79b3c7c16a7b994a63a28a7db",
     "tests/multi-vendor.spec.ts": "8776b1f07bef25c5a11d7940a609d2f3d1d10a1e52d46be5656e0fb6970d5d5b",
     "tests/settlement.spec.ts": "684cb15c58fb94e2ac67c7b094648208cc34ce9b1c44182ac25d1319104cbf84",

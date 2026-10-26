@@ -54,5 +54,18 @@ describe("Michelin Kitchen & Bottleneck Guardrails Self-Test", () => {
     const bench = runPerformanceBenchmark();
     expect(bench.overallPassed).toBe(true);
     expect(bench.metrics.length).toBeGreaterThanOrEqual(2);
+
+    const customBench = runPerformanceBenchmark(process.cwd(), [
+      {
+        name: "Custom Consumer Workload (1,000 ops)",
+        iterations: 1_000,
+        maxAllowedDurationMs: 200,
+        fn: () => {
+          Math.sqrt(144);
+        }
+      }
+    ]);
+    expect(customBench.overallPassed).toBe(true);
+    expect(customBench.metrics[0]?.name).toBe("Custom Consumer Workload (1,000 ops)");
   });
 });
