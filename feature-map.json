@@ -20,47 +20,23 @@
   },
   "features": [
     {
-      "id": "orbital-thruster-telemetry",
-      "name": "Orbital Thruster Impulse Calculator (Mars Orbiter Safeguard)",
+      "id": "control-glass-verification-engine",
+      "name": "7-Gate Empirical Verification & AST Guardrail Engine",
       "tier": "Tier 2",
-      "riskReason": "Mission-critical physics calculation; unit mismatch causes catastrophic trajectory loss.",
-      "entrypoints": ["src/features/thruster/impulse-calculator.ts"],
+      "riskReason": "Core verification pipeline, Dune AST Linter, Deslop Engine, and SHA-256 TDD Lock.",
+      "entrypoints": [
+        "src/harness/control-glass.ts",
+        "src/harness/dune-linter.ts",
+        "src/harness/deslop.ts",
+        "src/harness/tdd-guard.ts",
+        "src/harness/safety-gate.ts",
+        "src/harness/diff-reviewer.ts",
+        "src/harness/auto-mapper.ts",
+        "src/harness/bench.ts"
+      ],
       "contracts": ["src/core/contracts.ts"],
-      "tests": ["tests/impulse-calculator.spec.ts"],
-      "domOrUiSelectors": ["#thruster-telemetry-panel", "[data-testid='impulse-ns-readout']"],
-      "verificationCommand": "npm run verify"
-    },
-    {
-      "id": "payment-settlement-ledger",
-      "name": "Precision Financial Ledger (Knight Capital Safeguard)",
-      "tier": "Tier 2",
-      "riskReason": "Financial ledger state mutation; requires integer minor units (Satang) and strict idempotency.",
-      "entrypoints": ["src/features/ledger/settlement.ts"],
-      "contracts": ["src/core/contracts.ts"],
-      "tests": ["tests/settlement.spec.ts"],
-      "domOrUiSelectors": ["#ledger-summary-card", "[data-testid='balance-satang']"],
-      "verificationCommand": "npm run verify"
-    },
-    {
-      "id": "telemetry-dashboard-view",
-      "name": "Telemetry UI Formatter (Renderer Safe)",
-      "tier": "Tier 0",
-      "riskReason": "Pure UI formatting over validated read-only view models; safe for automated merge if all gates pass.",
-      "entrypoints": ["src/ui/telemetry-view.ts"],
-      "contracts": ["src/core/contracts.ts"],
-      "tests": ["tests/telemetry-view.spec.ts"],
-      "domOrUiSelectors": ["#telemetry-view-root", ".status-badge"],
-      "verificationCommand": "npm run verify"
-    },
-    {
-      "id": "canary-rollout-orchestrator",
-      "name": "Canary Progressive Rollout Gate (CrowdStrike Safeguard)",
-      "tier": "Tier 1",
-      "riskReason": "Enforces staged deployment transitions (1% -> 10% -> 100%) and error-free promotion.",
-      "entrypoints": ["src/features/rollout/canary-gate.ts"],
-      "contracts": ["src/core/contracts.ts"],
-      "tests": ["tests/canary-gate.spec.ts"],
-      "domOrUiSelectors": ["#canary-rollout-stepper"],
+      "tests": ["tests/harness-guardrails.spec.ts"],
+      "domOrUiSelectors": [],
       "verificationCommand": "npm run verify"
     },
     {
@@ -80,9 +56,9 @@
     },
     {
       "id": "polyglot-language-engine",
-      "name": "Universal Polyglot Engine (TypeScript, Python, Go, PHP)",
+      "name": "Universal Polyglot Engine (TypeScript, React, Node.js, Python, Go, PHP)",
       "tier": "Tier 2",
-      "riskReason": "Enforces Dune Linter, Deslop, Auto-Mapper, and SHA-256 TDD Locks across .ts, .py, .go, and .php codebases.",
+      "riskReason": "Enforces Dune Linter, Deslop, Auto-Mapper, and SHA-256 TDD Locks across .ts, .tsx, .py, .go, and .php codebases.",
       "entrypoints": ["src/harness/polyglot-engine.ts"],
       "contracts": ["src/core/contracts.ts"],
       "tests": ["tests/polyglot-engine.spec.ts"],

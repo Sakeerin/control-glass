@@ -4,11 +4,9 @@ import {
   createIdempotencyKey,
   createNewtonSeconds,
   createNonEmptyText,
-  createPoundForceSeconds,
+  createPercentageInt,
   createSatang
 } from "../core/contracts.js";
-import { applySettlementDebit } from "../features/ledger/settlement.js";
-import { convertPoundForceToNewtonSeconds } from "../features/thruster/impulse-calculator.js";
 
 export interface BenchmarkMetric {
   readonly name: string;
@@ -78,42 +76,24 @@ export function runPerformanceBenchmark(
       );
     }
   } else {
-    const imperialSample = createPoundForceSeconds(250);
-    const accId = createNonEmptyText("ACC-BENCH");
-    const initialBal = createSatang(10_000_000);
-    const debitAmt = createSatang(100);
-    const txKey = createIdempotencyKey("tx-bench-key-00001");
-
     metrics.push(
       measureWorkload(
-        "Orbital Impulse Conversion (10,000 ops)",
+        "Branded Numeric Contract Validation (10,000 ops)",
         10_000,
         500,
         () => {
-          if (imperialSample.ok) {
-            convertPoundForceToNewtonSeconds(imperialSample.value);
-          }
           createNewtonSeconds(444.82);
+          createSatang(25_000);
+          createPercentageInt(10);
         }
       ),
       measureWorkload(
-        "Precision Ledger Settlement & Idempotency (10,000 ops)",
+        "Branded Text & Idempotency Contract Validation (10,000 ops)",
         10_000,
-        800,
+        500,
         () => {
-          if (accId.ok && initialBal.ok && debitAmt.ok && txKey.ok) {
-            applySettlementDebit(
-              {
-                accountId: accId.value,
-                balanceSatang: initialBal.value,
-                processedKeys: new Set()
-              },
-              {
-                idempotencyKey: txKey.value,
-                debitAmount: debitAmt.value
-              }
-            );
-          }
+          createNonEmptyText("MISSION-CONTROL");
+          createIdempotencyKey("tx-bench-key-00001");
         }
       )
     );

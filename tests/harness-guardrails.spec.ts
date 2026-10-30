@@ -1,4 +1,11 @@
 import { describe, expect, it } from "vitest";
+import {
+  createIdempotencyKey,
+  createNewtonSeconds,
+  createPercentageInt,
+  createPoundForceSeconds,
+  createSatang
+} from "../src/core/contracts.js";
 import { buildDependencyGraph } from "../src/harness/auto-mapper.js";
 import { runPerformanceBenchmark } from "../src/harness/bench.js";
 import { runDeslopEngine } from "../src/harness/deslop.js";
@@ -7,7 +14,19 @@ import { runDuneLinter } from "../src/harness/dune-linter.js";
 import { runSafetyGate } from "../src/harness/safety-gate.js";
 import { verifyTddLock } from "../src/harness/tdd-guard.js";
 
-describe("Michelin Kitchen & Bottleneck Guardrails Self-Test", () => {
+describe("Control Glass 7-Gate Guardrails & Branded Contracts Self-Test", () => {
+  it("validates Branded Types and rejects invalid negative/out-of-bounds values", () => {
+    expect(createNewtonSeconds(444.82).ok).toBe(true);
+    expect(createNewtonSeconds(-1).ok).toBe(false);
+    expect(createPoundForceSeconds(100).ok).toBe(true);
+    expect(createSatang(25_000).ok).toBe(true);
+    expect(createSatang(12.34).ok).toBe(false);
+    expect(createPercentageInt(10).ok).toBe(true);
+    expect(createPercentageInt(150).ok).toBe(false);
+    expect(createIdempotencyKey("tx-valid-key-001").ok).toBe(true);
+    expect(createIdempotencyKey("short").ok).toBe(false);
+  });
+
   it("passes Dune AST Linter with zero comments and intact boundaries", () => {
     const res = runDuneLinter();
     expect(res.passed).toBe(true);
@@ -25,12 +44,12 @@ describe("Michelin Kitchen & Bottleneck Guardrails Self-Test", () => {
     expect(res.passed).toBe(true);
   });
 
-  it("routes UI-only changes to Tier 0 (Auto-Merge) and Ledger/Thruster changes to Tier 2 (Senior Review)", () => {
-    const tier0Report = analyzeDiffAndTier(process.cwd(), ["src/ui/telemetry-view.ts"]);
+  it("routes UI-only changes to Tier 0 (Auto-Merge) and Core/Harness changes to Tier 2 (Senior Review)", () => {
+    const tier0Report = analyzeDiffAndTier(process.cwd(), ["src/ui/Component.tsx"]);
     expect(tier0Report.recommendedTier).toBe("Tier 0");
 
     const tier2Report = analyzeDiffAndTier(process.cwd(), [
-      "src/features/ledger/settlement.ts"
+      "src/core/contracts.ts"
     ]);
     expect(tier2Report.recommendedTier).toBe("Tier 2");
   });
@@ -39,7 +58,7 @@ describe("Michelin Kitchen & Bottleneck Guardrails Self-Test", () => {
     const graph = buildDependencyGraph();
     expect(graph.totalFiles).toBeGreaterThanOrEqual(10);
     expect(graph.nodes["src/core/contracts.ts"]?.layer).toBe("core");
-    expect(graph.nodes["src/ui/telemetry-view.ts"]?.imports).toContain(
+    expect(graph.nodes["src/vendors/llm-gateway.ts"]?.imports).toContain(
       "src/core/contracts.ts"
     );
   });

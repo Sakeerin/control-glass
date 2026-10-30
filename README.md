@@ -182,16 +182,14 @@ export type OrderId = Brand<string, "OrderId">;
 control-glass/
 ├── plugin.json                      # Plugin Manifest v3.0
 ├── mcp_config.json                  # การตั้งค่า MCP Server มาตรฐาน
-├── AGENTS.md                        # สัญญาหลักสำหรับ OpenAI Codex / Universal Agents
-├── CLAUDE.md                        # สัญญาหลักสำหรับ Anthropic Claude Code
-├── .claude/commands/                # Slash Commands สำหรับ Claude Code
-├── .cursor/rules/control-glass.mdc  # กฎอัตโนมัติสำหรับ Cursor IDE
-├── .github/copilot-instructions.md  # กฎอัตโนมัติสำหรับ GitHub Copilot
-├── .windsurfrules                   # กฎอัตโนมัติสำหรับ Windsurf
+├── AGENTS.md                        # สัญญาหลักสำหรับ AI Coding Agents
+├── feature-map.json                 # Materialized Memory (แผนผังฟีเจอร์และขอบเขตสถาปัตยกรรม)
 ├── agents/
 │   └── interrogator.md              # 🕵️‍♂️ Red-Team Adversarial Reviewer Subagent
-├── skills/                          # ชุดทักษะของปลั๊กอิน
-│   ├── control-glass-mode/          # 🧭 Main Router Skill (5 Playbooks: feature, bug, perf, gardener, review)
+├── rules/
+│   └── AGENTS.md                    # กฎอัตโนมัติประจำปลั๊กอิน
+├── skills/                          # ชุดทักษะของปลั๊กอิน (10 Skills + 5 Playbooks)
+│   ├── control-glass-mode/          # 🧭 Main Router Skill (feature, bug, perf, gardener, review)
 │   ├── how-why/                     # 🗺️ Polyglot Dependency Graph & Git Intent Comprehension
 │   ├── arena/                       # 🏛️ Contract-Driven Architecture Competition (100-pt Scorecard)
 │   ├── deslop/                      # 🧹 Deterministic Polyglot Slop Cleaner
@@ -206,23 +204,21 @@ control-glass/
 │   ├── index.ts                     # Library Entrypoint
 │   ├── core/contracts.ts            # Branded Types & Result Monad
 │   ├── vendors/llm-gateway.ts       # Multi-Vendor LLM Payload Adapter (Claude, OpenAI, Gemini, Ollama)
-│   ├── harness/
-│   │   ├── polyglot-engine.ts       # 💻 Built-in Polyglot Engine (TypeScript, Python, Go, PHP)
-│   │   ├── control-glass.ts         # 7-Gate Verification Pipeline Runner
-│   │   ├── dune-linter.ts           # Polyglot Dune Linter
-│   │   ├── deslop.ts                # Polyglot Slop Detector & Comment Stripper
-│   │   ├── auto-mapper.ts           # Polyglot Dependency & Export Graph Builder
-│   │   ├── tdd-guard.ts             # Recursive SHA-256 TDD Lock (.ts, .py, .go, .php)
-│   │   ├── safety-gate.ts           # Secret Leak & Destructive Command Scanner
-│   │   ├── diff-reviewer.ts         # Tier 0 / 1 / 2 Diff Orchestrator
-│   │   ├── bench.ts                 # Runtime & V8 Heap Hill-Climber
-│   │   ├── mcp-server.ts            # Universal Model Context Protocol (MCP) Server
-│   │   ├── vendor-sync.ts           # Multi-Vendor AI Config Synchronizer
-│   │   ├── hook-installer.ts        # Git Pre-Commit & GitHub Actions CI Installer
-│   │   └── cli.ts                   # Executable CLI (`npx control-glass`)
-│   ├── features/                    # ตัวอย่างโดเมนฟีเจอร์ (Thruster, Ledger, Canary Rollout)
-│   └── ui/                          # ตัวอย่างชั้นแสดงผล (Renderer-safe Tier 0)
-├── tests/                           # ชุดทดสอบระบบที่ถูกล็อกด้วย SHA-256
+│   └── harness/
+│       ├── polyglot-engine.ts       # 💻 Built-in Polyglot Engine (TypeScript, React, Node.js, Python, Go, PHP)
+│       ├── control-glass.ts         # 7-Gate Verification Pipeline Runner
+│       ├── dune-linter.ts           # Polyglot Dune Linter
+│       ├── deslop.ts                # Polyglot Slop Detector & Comment Stripper
+│       ├── auto-mapper.ts           # Polyglot Dependency & Export Graph Builder
+│       ├── tdd-guard.ts             # Recursive SHA-256 TDD Lock (.ts, .tsx, .py, .go, .php)
+│       ├── safety-gate.ts           # Secret Leak & Destructive Command Scanner
+│       ├── diff-reviewer.ts         # Tier 0 / 1 / 2 Diff Orchestrator
+│       ├── bench.ts                 # Runtime & V8 Heap Hill-Climber
+│       ├── mcp-server.ts            # Universal Model Context Protocol (MCP) Server
+│       ├── vendor-sync.ts           # Multi-Vendor AI Config Synchronizer
+│       ├── hook-installer.ts        # Git Pre-Commit & GitHub Actions CI Installer
+│       └── cli.ts                   # Executable CLI (`npx control-glass`)
+├── tests/                           # ชุดทดสอบระบบหลักที่ถูกล็อกด้วย SHA-256
 └── LICENSE                          # MIT License
 ```
 

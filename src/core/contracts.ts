@@ -81,9 +81,3 @@ export function createIdempotencyKey(
   }
   return ok(parsed.data as IdempotencyKey);
 }
-
-export interface TelemetryReadoutViewModel {
-  readonly missionName: NonEmptyText;
-  readonly totalImpulseNs: NewtonSeconds;
-  readonly status: "NOMINAL" | "WARNING";
-}
