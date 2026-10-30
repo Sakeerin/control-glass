@@ -1,4 +1,9 @@
+import fs from "node:fs";
+import os from "node:os";
+import path from "node:path";
 import { describe, expect, it } from "vitest";
+import { resolvePolyglotGateCommands } from "../src/harness/control-glass.js";
+import { runDuneLinter } from "../src/harness/dune-linter.js";
 import {
   POLYGLOT_CONTRACT_TEMPLATES,
   lintNonTsSourceText,
@@ -126,11 +131,55 @@ describe("Polyglot Engine (Python, Go, PHP) Verification & Deslop", () => {
     expect(strippedPy.cleanedText).toContain("https://example.com#anchor");
     expect(strippedPy.cleanedText).not.toContain("strip this");
 
-    const goCode = 'url := "https://example.com//path" // strip go comment';
+    const goCode = 'url := "https://example.com//path" // strip go comment\n/* multi-line\nblock comment */\nx := 1';
     const strippedGo = stripNonTsComments(goCode, "go");
-    expect(strippedGo.removedCount).toBe(1);
+    expect(strippedGo.removedCount).toBe(2);
     expect(strippedGo.cleanedText).toContain("https://example.com//path");
     expect(strippedGo.cleanedText).not.toContain("strip go comment");
+    expect(strippedGo.cleanedText).not.toContain("block comment");
+
+    const pyDoc = '"""\nMulti-line docstring\n"""\nx = 42';
+    const strippedDoc = stripNonTsComments(pyDoc, "python");
+    expect(strippedDoc.removedCount).toBe(1);
+    expect(strippedDoc.cleanedText.trim()).toBe("x = 42");
+  });
+
+  it("resolves polyglot static check and test commands for TS, Python, Go, and PHP manifests", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cg-polyglot-"));
+    try {
+      fs.writeFileSync(path.join(tmpDir, "pyproject.toml"), "[tool.pytest]\n", "utf8");
+      fs.writeFileSync(path.join(tmpDir, "go.mod"), "module example.com/app\n", "utf8");
+      fs.writeFileSync(path.join(tmpDir, "composer.json"), "{}\n", "utf8");
+
+      const cmds = resolvePolyglotGateCommands(tmpDir);
+      expect(cmds.staticCheckCommands).toContain("mypy .");
+      expect(cmds.staticCheckCommands).toContain("go vet ./...");
+      expect(cmds.staticCheckCommands).toContain("vendor/bin/phpstan analyse");
+      expect(cmds.testCommands).toContain("pytest");
+      expect(cmds.testCommands).toContain("go test ./...");
+      expect(cmds.testCommands).toContain("vendor/bin/phpunit");
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
+  });
+
+  it("enforces React .tsx component boundary lock against importing node:fs or src/infra/", () => {
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), "cg-react-tsx-"));
+    try {
+      const compDir = path.join(tmpDir, "components");
+      fs.mkdirSync(compDir, { recursive: true });
+      fs.writeFileSync(
+        path.join(compDir, "Widget.tsx"),
+        'import fs from "node:fs";\nexport function Widget() { return <div>{typeof fs}</div>; }\n',
+        "utf8"
+      );
+
+      const res = runDuneLinter(tmpDir);
+      expect(res.passed).toBe(false);
+      expect(res.violations.some((v) => v.ruleId === "DUNE_BOUNDARY_VIOLATION")).toBe(true);
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+    }
   });
 
   it("parses React JSX (.tsx) components accurately without false-positive type assertion errors", async () => {

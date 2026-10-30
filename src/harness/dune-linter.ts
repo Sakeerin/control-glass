@@ -110,6 +110,14 @@ function resolveRelativeImportTarget(importerRelativePath: string, moduleSpecifi
   return path.posix.normalize(path.posix.join(importerDir, moduleSpecifier));
 }
 
+const REACT_COMPONENT_FORBIDDEN_IMPORTS: readonly string[] = [
+  "src/infra/",
+  "node:fs",
+  "node:child_process",
+  "fs",
+  "child_process"
+];
+
 function checkModuleSpecifierAgainstBoundaries(
   sourceFile: ts.SourceFile,
   nodePos: number,
@@ -119,17 +127,39 @@ function checkModuleSpecifierAgainstBoundaries(
   violations: LintViolation[]
 ): void {
   const resolvedTarget = resolveRelativeImportTarget(relativePath, rawSpec);
+  const lineNum = getLineNumber(sourceFile, nodePos);
+  let reported = false;
+
   for (const boundary of Object.values(boundaries)) {
     if (relativePath.startsWith(boundary.pathPrefix)) {
       for (const forbidden of boundary.forbiddenImports) {
         if (rawSpec === forbidden || resolvedTarget.startsWith(forbidden)) {
           violations.push({
             file: relativePath,
-            line: getLineNumber(sourceFile, nodePos),
+            line: lineNum,
             ruleId: "DUNE_BOUNDARY_VIOLATION",
             message: `Boundary lock violated: '${relativePath}' (${boundary.pathPrefix}) cannot import '${rawSpec}' (matches forbidden '${forbidden}').`
           });
+          reported = true;
         }
+      }
+    }
+  }
+
+  const isReactUiFile =
+    relativePath.endsWith(".tsx") ||
+    relativePath.startsWith("src/components/") ||
+    relativePath.startsWith("components/");
+
+  if (!reported && isReactUiFile) {
+    for (const forbidden of REACT_COMPONENT_FORBIDDEN_IMPORTS) {
+      if (rawSpec === forbidden || resolvedTarget.startsWith(forbidden)) {
+        violations.push({
+          file: relativePath,
+          line: lineNum,
+          ruleId: "DUNE_BOUNDARY_VIOLATION",
+          message: `React/UI boundary lock violated: '${relativePath}' cannot import Node I/O or infrastructure module '${rawSpec}'.`
+        });
       }
     }
   }

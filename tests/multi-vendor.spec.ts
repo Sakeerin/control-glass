@@ -93,5 +93,17 @@ describe("Universal Multi-Vendor AI Gateway & MCP Protocol", () => {
     });
     expect(callRes?.error).toBeUndefined();
     expect(callRes?.result).toBeDefined();
+
+    const langRes = handleMcpRequest({
+      jsonrpc: "2.0",
+      id: 3,
+      method: "tools/call",
+      params: {
+        name: "control_glass_detect_languages",
+        arguments: {}
+      }
+    });
+    expect(langRes?.error).toBeUndefined();
+    expect(langRes?.result).toBeDefined();
   });
 });

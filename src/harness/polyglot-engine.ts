@@ -268,7 +268,7 @@ export function lintNonTsSourceText(
     }
 
     if (lang === "go") {
-      if (/\binterface\s*\{\s*\}|\bany\b/.test(codeOnly)) {
+      if (/\binterface\s*\{\s*\}|(?:[)\]]|\b\w+)\s+any\b|\]any\b/.test(codeOnly)) {
         violations.push({
           file: relativePath,
           line: lineNum,
@@ -442,18 +442,73 @@ export function stripNonTsComments(
   const lines = sourceText.split(/\r?\n/);
   let removedCount = 0;
   const outLines: string[] = [];
+  let inBlockComment = false;
+  let inPythonDocstring: '"""' | "'''" | null = null;
 
   lines.forEach((rawLine, idx) => {
-    const codeOnly = maskStringsPreserveLength(rawLine);
+    const trimmed = rawLine.trim();
+
+    if (inPythonDocstring !== null) {
+      if (trimmed.includes(inPythonDocstring)) {
+        inPythonDocstring = null;
+      }
+      return;
+    }
+
+    if (inBlockComment) {
+      const closeIdx = rawLine.indexOf("*/");
+      if (closeIdx !== -1) {
+        inBlockComment = false;
+        const after = rawLine.slice(closeIdx + 2).trimEnd();
+        if (after.trim().length > 0) {
+          outLines.push(after);
+        }
+      }
+      return;
+    }
+
+    if (lang === "python" && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
+      const quote: '"""' | "'''" = trimmed.startsWith('"""') ? '"""' : "'''";
+      removedCount++;
+      if (!trimmed.slice(3).includes(quote)) {
+        inPythonDocstring = quote;
+      }
+      return;
+    }
+
+    let workingLine = rawLine;
+    let codeOnly = maskStringsPreserveLength(workingLine);
+
+    if ((lang === "go" || lang === "php") && codeOnly.includes("/*")) {
+      const openIdx = codeOnly.indexOf("/*");
+      const closeIdx = codeOnly.indexOf("*/", openIdx + 2);
+      removedCount++;
+      if (closeIdx !== -1) {
+        const before = workingLine.slice(0, openIdx);
+        const after = workingLine.slice(closeIdx + 2);
+        workingLine = (before + after).trimEnd();
+        if (workingLine.trim().length === 0) {
+          return;
+        }
+        codeOnly = maskStringsPreserveLength(workingLine);
+      } else {
+        inBlockComment = true;
+        const before = workingLine.slice(0, openIdx).trimEnd();
+        if (before.trim().length > 0) {
+          outLines.push(before);
+        }
+        return;
+      }
+    }
 
     if (lang === "python" || lang === "php") {
       const hashIdx = codeOnly.indexOf("#");
-      const isPhpAttr = lang === "php" && hashIdx !== -1 && rawLine.slice(hashIdx).startsWith("#[");
+      const isPhpAttr = lang === "php" && hashIdx !== -1 && workingLine.slice(hashIdx).startsWith("#[");
       if (hashIdx !== -1 && !isPhpAttr) {
-        const commentPart = rawLine.slice(hashIdx).trim();
+        const commentPart = workingLine.slice(hashIdx).trim();
         if (!isAllowedDirectiveComment(lang, idx, commentPart)) {
           removedCount++;
-          const before = rawLine.slice(0, hashIdx).trimEnd();
+          const before = workingLine.slice(0, hashIdx).trimEnd();
           if (before.length > 0) {
             outLines.push(before);
           }
@@ -465,10 +520,10 @@ export function stripNonTsComments(
     if (lang === "go" || lang === "php") {
       const slashIdx = codeOnly.indexOf("//");
       if (slashIdx !== -1) {
-        const commentPart = rawLine.slice(slashIdx).trim();
+        const commentPart = workingLine.slice(slashIdx).trim();
         if (!isAllowedDirectiveComment(lang, idx, commentPart)) {
           removedCount++;
-          const before = rawLine.slice(0, slashIdx).trimEnd();
+          const before = workingLine.slice(0, slashIdx).trimEnd();
           if (before.length > 0) {
             outLines.push(before);
           }
@@ -477,7 +532,7 @@ export function stripNonTsComments(
       }
     }
 
-    outLines.push(rawLine);
+    outLines.push(workingLine);
   });
 
   return {

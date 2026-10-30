@@ -4,6 +4,7 @@ import { runPerformanceBenchmark } from "./bench.js";
 import { runDeslopEngine } from "./deslop.js";
 import { analyzeDiffAndTier } from "./diff-reviewer.js";
 import { runDuneLinter } from "./dune-linter.js";
+import { detectProjectLanguages } from "./polyglot-engine.js";
 import { runSafetyGate } from "./safety-gate.js";
 import { verifyTddLock, writeTddLockManifest } from "./tdd-guard.js";
 
@@ -89,6 +90,16 @@ export const CONTROL_GLASS_MCP_TOOLS = [
       properties: {},
       additionalProperties: false
     }
+  },
+  {
+    name: "control_glass_detect_languages",
+    description:
+      "Detects active polyglot project languages (.ts, .tsx, .py, .go, .php) in the workspace.",
+    inputSchema: {
+      type: "object",
+      properties: {},
+      additionalProperties: false
+    }
   }
 ] as const;
 
@@ -113,7 +124,7 @@ export function handleMcpRequest(
         },
         serverInfo: {
           name: "control-glass-mcp",
-          version: "2.1.0"
+          version: "3.0.0"
         }
       }
     };
@@ -137,16 +148,26 @@ export function handleMcpRequest(
 
     switch (toolName) {
       case "control_glass_verify_gates": {
+        const detectedLanguages = detectProjectLanguages(rootDir);
         const dune = runDuneLinter(rootDir);
+        const deslop = runDeslopEngine(rootDir, false);
         const safety = runSafetyGate(rootDir);
         const tdd = verifyTddLock(rootDir);
         const diff = analyzeDiffAndTier(rootDir);
         payload = {
-          passed: dune.passed && safety.passed && tdd.passed,
+          passed: dune.passed && deslop.passed && safety.passed && tdd.passed,
+          detectedLanguages,
           dune,
+          deslop,
           safety,
           tdd,
           diff
+        };
+        break;
+      }
+      case "control_glass_detect_languages": {
+        payload = {
+          detectedLanguages: detectProjectLanguages(rootDir)
         };
         break;
       }

@@ -31,7 +31,9 @@ export {
 } from "./harness/diff-reviewer.js";
 export {
   runControlGlass,
-  type EmpiricalEvidenceArtifact
+  resolvePolyglotGateCommands,
+  type EmpiricalEvidenceArtifact,
+  type PolyglotGateCommands
 } from "./harness/control-glass.js";
 export {
   buildDependencyGraph,

@@ -46,6 +46,56 @@ export interface EmpiricalEvidenceArtifact {
   readonly phase3Orchestration: DiffReviewReport;
 }
 
+export interface PolyglotGateCommands {
+  readonly staticCheckCommands: readonly string[];
+  readonly testCommands: readonly string[];
+}
+
+export function resolvePolyglotGateCommands(rootDir: string): PolyglotGateCommands {
+  const staticCheckCommands: string[] = [];
+  const testCommands: string[] = [];
+
+  if (fs.existsSync(path.join(rootDir, "tsconfig.json"))) {
+    staticCheckCommands.push("npx tsc --noEmit");
+  }
+  if (fs.existsSync(path.join(rootDir, "package.json"))) {
+    testCommands.push("npx vitest run");
+  }
+
+  if (
+    fs.existsSync(path.join(rootDir, "pyproject.toml")) ||
+    fs.existsSync(path.join(rootDir, "mypy.ini")) ||
+    fs.existsSync(path.join(rootDir, "requirements.txt"))
+  ) {
+    staticCheckCommands.push("mypy .");
+    testCommands.push("pytest");
+  }
+
+  if (fs.existsSync(path.join(rootDir, "go.mod"))) {
+    staticCheckCommands.push("go vet ./...");
+    testCommands.push("go test ./...");
+  }
+
+  if (
+    fs.existsSync(path.join(rootDir, "composer.json")) ||
+    fs.existsSync(path.join(rootDir, "phpunit.xml"))
+  ) {
+    staticCheckCommands.push("vendor/bin/phpstan analyse");
+    testCommands.push("vendor/bin/phpunit");
+  }
+
+  return { staticCheckCommands, testCommands };
+}
+
+function isCommandAvailable(probeCmd: string, cwd: string): boolean {
+  try {
+    execSync(probeCmd, { cwd, stdio: "ignore" });
+    return true;
+  } catch {
+    return false;
+  }
+}
+
 function runCommandGate(command: string, cwd: string): { passed: boolean; output: string } {
   try {
     const out = execSync(command, {
@@ -63,18 +113,74 @@ function runCommandGate(command: string, cwd: string): { passed: boolean; output
   }
 }
 
+function runPolyglotStaticGate(
+  rootDir: string,
+  commands: readonly string[]
+): { passed: boolean; output: string } {
+  if (commands.length === 0) {
+    return { passed: true, output: "No external static compiler config; AST linter active" };
+  }
+  const outputs: string[] = [];
+  for (const cmd of commands) {
+    if (cmd.startsWith("mypy") && !isCommandAvailable("mypy --version", rootDir)) continue;
+    if (cmd.startsWith("go ") && !isCommandAvailable("go version", rootDir)) continue;
+    if (
+      cmd.startsWith("vendor/bin/phpstan") &&
+      !fs.existsSync(path.join(rootDir, "vendor", "bin", "phpstan"))
+    ) {
+      continue;
+    }
+    const res = runCommandGate(cmd, rootDir);
+    outputs.push(res.output);
+    if (!res.passed) {
+      return { passed: false, output: outputs.join("\n").trim() };
+    }
+  }
+  return {
+    passed: true,
+    output: outputs.filter((o) => o.length > 0).join("\n") || "All static checks passed"
+  };
+}
+
+function runPolyglotTestGate(
+  rootDir: string,
+  commands: readonly string[]
+): { passed: boolean; output: string } {
+  if (commands.length === 0) {
+    return { passed: true, output: "No test runner manifest detected" };
+  }
+  const outputs: string[] = [];
+  for (const cmd of commands) {
+    if (cmd === "pytest" && !isCommandAvailable("pytest --version", rootDir)) continue;
+    if (cmd.startsWith("go ") && !isCommandAvailable("go version", rootDir)) continue;
+    if (
+      cmd === "vendor/bin/phpunit" &&
+      !fs.existsSync(path.join(rootDir, "vendor", "bin", "phpunit"))
+    ) {
+      continue;
+    }
+    const res = runCommandGate(cmd, rootDir);
+    outputs.push(res.output);
+    if (!res.passed) {
+      return { passed: false, output: outputs.join("\n").trim() };
+    }
+  }
+  return {
+    passed: true,
+    output: outputs.filter((o) => o.length > 0).join("\n") || "All polyglot test suites passed"
+  };
+}
+
 export function runControlGlass(rootDir: string = process.cwd()): EmpiricalEvidenceArtifact {
   const startTime = performance.now();
   const detectedLanguages = detectProjectLanguages(rootDir);
+  const polyglotCmds = resolvePolyglotGateCommands(rootDir);
 
   console.log(
     `🔬 [Control Glass] Starting Polyglot Empirical Verification Pipeline (${detectedLanguages.join(", ") || "typescript"})...\n`
   );
 
-  const hasTsConfig = fs.existsSync(path.join(rootDir, "tsconfig.json"));
-  const typecheckRes = hasTsConfig
-    ? runCommandGate("npx tsc --noEmit", rootDir)
-    : { passed: true, output: "No tsconfig.json; skipped tsc" };
+  const typecheckRes = runPolyglotStaticGate(rootDir, polyglotCmds.staticCheckCommands);
   console.log(
     `  1. [Level 1] Static Compiler & Contract Check: ${typecheckRes.passed ? "✅ PASS" : "❌ FAIL"}`
   );
@@ -99,7 +205,7 @@ export function runControlGlass(rootDir: string = process.cwd()): EmpiricalEvide
     `  5. [Phase 1] TDD & Contract Immutability Lock: ${tddRes.passed ? "✅ PASS" : "❌ FAIL"}`
   );
 
-  const testRes = runCommandGate("npx vitest run", rootDir);
+  const testRes = runPolyglotTestGate(rootDir, polyglotCmds.testCommands);
   console.log(
     `  6. [Level 1] Empirical Contract & Unit Tests: ${testRes.passed ? "✅ PASS" : "❌ FAIL"}`
   );

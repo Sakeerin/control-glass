@@ -131,20 +131,21 @@ export function initControlGlassProject(
 
 function printHelp(): void {
   console.log(`
-🔬 Control Glass CLI v2.1 — Universal Multi-Vendor Agentic Engineering Harness
+🔬 Control Glass CLI v3.0 — Universal Polyglot & Multi-Vendor Agentic Engineering Harness
 
 Usage:
   control-glass <command> [options]
 
 Commands:
-  init            Initialize Control Glass & multi-vendor configs in any repository
+  init            Initialize Control Glass & multi-vendor configs in any repository (--lang python|go|php|all)
+  languages       Detect active project languages (.ts, .tsx, .py, .go, .php) and polyglot engines
   sync-vendors    Generate instruction files & slash commands for Claude, OpenAI, Cursor, Copilot, Windsurf & MCP
   mcp             Start the Control Glass MCP (Model Context Protocol) stdio server for any AI client
   vendors         Inspect supported AI vendor adapters (Anthropic Claude, OpenAI, Gemini, Ollama/OpenRouter)
-  verify          Run full 6-gate empirical verification pipeline & emit .control-glass/evidence-latest.json
-  lint            Run Dune AST Linter (No-Comment, Boundary Lock, No-Any, No-Console)
-  deslop [--fix]  Detect & strip AI slop (comments, empty catch blocks, leftover debuggers)
-  map             Auto-generate AST Dependency & Export Graph (.control-glass/dependency-graph.json)
+  verify          Run full 7-gate polyglot empirical verification pipeline & emit .control-glass/evidence-latest.json
+  lint            Run Polyglot Dune AST Linter (No-Comment, Boundary Lock, No-Any, No-Console, Strict-Types)
+  deslop [--fix]  Detect & strip AI slop (comments, empty catch blocks, swallowed errors, leftover debuggers)
+  map             Auto-generate Polyglot AST Dependency & Export Graph (.control-glass/dependency-graph.json)
   bench           Run empirical performance & V8 heap memory hill-climbing benchmark
   safety          Run Phase 2 Safety & Secret Gate (API key leak & destructive command blocker)
   tdd-check       Verify Phase 1 TDD & Contract SHA-256 immutability lock

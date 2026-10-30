@@ -90,7 +90,15 @@ export function analyzeDiffAndTier(
   const impacted: DiffReviewReport["impactedFeatures"][number][] = [];
 
   for (const file of changedFiles) {
-    if (file.startsWith("src/core/") || file.startsWith("src/harness/")) {
+    if (
+      file.startsWith("src/core/") ||
+      file.startsWith("src/Core/") ||
+      file.startsWith("src/harness/") ||
+      file.endsWith("/contracts.ts") ||
+      file.endsWith("/contracts.py") ||
+      file.endsWith("/contracts.go") ||
+      file.endsWith("/Contracts.php")
+    ) {
       highestTier = "Tier 2";
     }
     for (const feature of features) {
@@ -112,7 +120,12 @@ export function analyzeDiffAndTier(
   }
 
   if (changedFiles.length > 0 && impacted.length === 0 && highestTier === "Tier 0") {
-    const onlyUi = changedFiles.every((f) => f.startsWith("src/ui/"));
+    const onlyUi = changedFiles.every(
+      (f) =>
+        f.startsWith("src/ui/") ||
+        f.startsWith("src/components/") ||
+        f.startsWith("components/")
+    );
     if (!onlyUi) {
       highestTier = "Tier 1";
     }
@@ -124,7 +137,7 @@ export function analyzeDiffAndTier(
     "Tier 1":
       "TASK OWNER REVIEW: Moderate feature change. Route to Task Owner with Diff Consequence summary.",
     "Tier 2":
-      "SENIOR / DOMAIN EXPERT REVIEW REQUIRED: Touches critical contracts, financial ledger, or orbital physics logic."
+      "SENIOR / DOMAIN EXPERT REVIEW REQUIRED: Touches critical core contracts, verification harness, or Tier 2 high-risk domain logic."
   };
 
   return {
