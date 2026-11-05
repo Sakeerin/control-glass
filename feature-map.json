@@ -103,6 +103,7 @@
       ],
       "tests": [
         "tests/polyglot-engine.spec.ts",
+        "tests/polyglot-contracts.spec.ts",
         "tests/analysis-regressions.spec.ts",
         "tests/control-regressions.spec.ts",
         "tests/review-fixtures.contract.ts"

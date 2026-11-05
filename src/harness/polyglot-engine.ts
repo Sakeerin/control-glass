@@ -178,6 +178,7 @@ export const POLYGLOT_CONTRACT_TEMPLATES: Record<Exclude<SupportedLanguage, "typ
   python: {
     targetPath: "src/core/contracts.py",
     content: `from dataclasses import dataclass
+from math import isfinite
 from typing import Generic, NewType, TypeVar, Union
 
 T = TypeVar("T")
@@ -186,6 +187,8 @@ E = TypeVar("E")
 NewtonSeconds = NewType("NewtonSeconds", float)
 PoundForceSeconds = NewType("PoundForceSeconds", float)
 Satang = NewType("Satang", int)
+
+_MAX_SAFE_INTEGER = 9007199254740991
 
 @dataclass(frozen=True)
 class Ok(Generic[T]):
@@ -199,13 +202,29 @@ class Err(Generic[E]):
 
 Result = Union[Ok[T], Err[E]]
 
+def _finite_nonnegative_number(raw: float) -> float | None:
+    if isinstance(raw, bool) or not isinstance(raw, (int, float)):
+        return None
+    try:
+        value = float(raw)
+    except (OverflowError, ValueError):
+        return None
+    return value if isfinite(value) and value >= 0.0 else None
+
 def create_newton_seconds(raw: float) -> Result[NewtonSeconds, str]:
-    if raw < 0.0:
+    value = _finite_nonnegative_number(raw)
+    if value is None:
         return Err("INVALID_NEWTON_SECONDS")
-    return Ok(NewtonSeconds(raw))
+    return Ok(NewtonSeconds(value))
+
+def create_pound_force_seconds(raw: float) -> Result[PoundForceSeconds, str]:
+    value = _finite_nonnegative_number(raw)
+    if value is None:
+        return Err("INVALID_POUND_FORCE_SECONDS")
+    return Ok(PoundForceSeconds(value))
 
 def create_satang(raw: int) -> Result[Satang, str]:
-    if raw < 0:
+    if isinstance(raw, bool) or not isinstance(raw, int) or raw < -_MAX_SAFE_INTEGER or raw > _MAX_SAFE_INTEGER:
         return Err("INVALID_SATANG_INTEGER")
     return Ok(Satang(raw))
 `
@@ -214,24 +233,41 @@ def create_satang(raw: int) -> Result[Satang, str]:
     targetPath: "src/core/contracts.go",
     content: `package core
 
-import "errors"
+import (
+	"errors"
+	"math"
+)
 
 type NewtonSeconds float64
 type PoundForceSeconds float64
 type Satang int64
 
+const maxSafeSatang int64 = 9007199254740991
+
 var ErrInvalidNewtonSeconds = errors.New("INVALID_NEWTON_SECONDS")
+var ErrInvalidPoundForceSeconds = errors.New("INVALID_POUND_FORCE_SECONDS")
 var ErrInvalidSatangInteger = errors.New("INVALID_SATANG_INTEGER")
 
+func finiteNonnegativeNumber(raw float64) bool {
+	return !math.IsNaN(raw) && !math.IsInf(raw, 0) && raw >= 0
+}
+
 func CreateNewtonSeconds(raw float64) (NewtonSeconds, error) {
-	if raw < 0 {
+	if !finiteNonnegativeNumber(raw) {
 		return 0, ErrInvalidNewtonSeconds
 	}
 	return NewtonSeconds(raw), nil
 }
 
+func CreatePoundForceSeconds(raw float64) (PoundForceSeconds, error) {
+	if !finiteNonnegativeNumber(raw) {
+		return 0, ErrInvalidPoundForceSeconds
+	}
+	return PoundForceSeconds(raw), nil
+}
+
 func CreateSatang(raw int64) (Satang, error) {
-	if raw < 0 {
+	if raw < -maxSafeSatang || raw > maxSafeSatang {
 		return 0, ErrInvalidSatangInteger
 	}
 	return Satang(raw), nil
@@ -253,8 +289,21 @@ final readonly class NewtonSeconds
 
     public static function fromFloat(float $raw): self
     {
-        if ($raw < 0.0) {
+        if (!is_finite($raw) || $raw < 0.0) {
             throw new InvalidArgumentException('INVALID_NEWTON_SECONDS');
+        }
+        return new self($raw);
+    }
+}
+
+final readonly class PoundForceSeconds
+{
+    private function __construct(public float $value) {}
+
+    public static function fromFloat(float $raw): self
+    {
+        if (!is_finite($raw) || $raw < 0.0) {
+            throw new InvalidArgumentException('INVALID_POUND_FORCE_SECONDS');
         }
         return new self($raw);
     }
@@ -262,11 +311,13 @@ final readonly class NewtonSeconds
 
 final readonly class Satang
 {
+    private const MAX_SAFE_INTEGER = 9007199254740991;
+
     private function __construct(public int $value) {}
 
     public static function fromInt(int $raw): self
     {
-        if ($raw < 0) {
+        if ($raw < -self::MAX_SAFE_INTEGER || $raw > self::MAX_SAFE_INTEGER) {
             throw new InvalidArgumentException('INVALID_SATANG_INTEGER');
         }
         return new self($raw);
