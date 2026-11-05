@@ -20,6 +20,26 @@ Override command selection explicitly with `control-glass.config.json`:
 
 Commands execute with the project's privileges. Keep this configuration under review. Do not point the test command back at `verify`, which would recurse. Empty command lists leave the required gate skipped and unsuccessful.
 
+## Evidence input digest
+
+`provenance.sourceTreeHash` uses a separate inventory that includes every regular workspace file, regardless of extension. It covers workflows and actions, YAML/TOML/INI/CFG/XML configuration, native manifests and lock files, policy and skill documents, executable scripts, extensionless files, and binary assets. Untracked and Git-ignored input files are included, such as local `.env` files.
+
+The following directory names are excluded at every depth:
+
+| Category | Excluded directories |
+| :--- | :--- |
+| Git and generated verification artifacts | `.git`, `.control-glass` |
+| Dependencies and environments | `node_modules`, `vendor`, `.venv`, `venv` |
+| Build output and caches | `dist`, `coverage`, `.next`, `.nuxt`, `.cache`, `__pycache__`, `.mypy_cache`, `.pytest_cache`, `.ruff_cache`, `.tox` |
+
+The `.control-glass/tdd-lock.json` input is included explicitly. Git's `.git` pointer file used by worktrees is excluded along with Git directories. Generated evidence, dependency graphs, and benchmark reports remain outside the digest, so repeated verification stays stable.
+
+The v2 digest sorts normalized relative paths and combines each path with the SHA-256 of that file's raw bytes under the `control-glass-provenance-v2` domain tag. Per-file digests prevent embedded binary separators from making one file indistinguishable from several file records. Adding, deleting, or renaming an included file changes the digest, as does editing its contents. Absolute checkout locations do not affect it; byte differences, including line endings, do.
+
+Verification compares the input digest before and after running its checks. Changes to any included input block successful evidence with `SOURCE_CHANGED_DURING_VERIFICATION`. Put generated command output in an excluded output or cache directory. Unreadable inputs and symlinks within the included scope fail provenance instead of being silently omitted; excluded dependency and output links remain outside that scope.
+
+The broader inventory and v2 record format change existing digest values. Generate fresh evidence after upgrading. Source analysis and safety scanning retain their existing file-selection rules.
+
 ## Review the entire change
 
 Use an explicit PR base and head:

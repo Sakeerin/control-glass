@@ -11,7 +11,7 @@ import { detectProjectLanguages, type SupportedLanguage } from "./polyglot-engin
 import { runSafetyGate } from "./safety-gate.js";
 import { verifyTddLock } from "./tdd-guard.js";
 import { loadCommandConfig } from "./project-config.js";
-import { collectProjectFiles } from "./file-inventory.js";
+import { collectProvenanceFiles } from "./file-inventory.js";
 import { isDirectExecution, readGit } from "./runtime.js";
 
 export type GateStatus = "passed" | "failed" | "skipped" | "error";
@@ -94,12 +94,11 @@ function attempt<T>(operation: () => T, fallback: T, errors: string[], name: str
 }
 
 function hashProjectSource(rootDir: string): string {
-  const hash = crypto.createHash("sha256");
-  for (const file of collectProjectFiles(rootDir)) {
-    hash.update(path.relative(rootDir, file).split(path.sep).join("/")).update("\0").update(fs.readFileSync(file)).update("\0");
+  const hash = crypto.createHash("sha256").update("control-glass-provenance-v2\0");
+  for (const file of collectProvenanceFiles(rootDir)) {
+    const contentHash = crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+    hash.update(path.relative(rootDir, file).split(path.sep).join("/")).update("\0").update(contentHash).update("\0");
   }
-  const lockFile = path.join(rootDir, ".control-glass/tdd-lock.json");
-  if (fs.existsSync(lockFile)) hash.update(fs.readFileSync(lockFile));
   return hash.digest("hex");
 }
 

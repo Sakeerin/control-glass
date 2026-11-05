@@ -32,3 +32,33 @@ export function collectProjectFiles(rootDir: string): string[] {
   if (fs.existsSync(rootDir)) visit(rootDir);
   return files.sort();
 }
+
+export function collectProvenanceFiles(rootDir: string): string[] {
+  const root = path.resolve(rootDir);
+  const files: string[] = [];
+  function relative(file: string): string {
+    return path.relative(root, file).split(path.sep).join("/");
+  }
+  function visit(directory: string): void {
+    for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
+      const full = path.join(directory, entry.name);
+      if (entry.name === ".git" || ((entry.isDirectory() || entry.isSymbolicLink()) && IGNORED_DIRECTORIES.has(entry.name))) continue;
+      if (entry.isSymbolicLink()) throw new Error("SYMLINK_PROVENANCE_UNSUPPORTED: " + relative(full));
+      if (entry.isDirectory()) visit(full);
+      else if (entry.isFile()) files.push(full);
+    }
+  }
+  if (fs.existsSync(root)) visit(root);
+  const lockFile = path.join(root, ".control-glass/tdd-lock.json");
+  if (fs.existsSync(lockFile)) {
+    const entry = fs.lstatSync(lockFile);
+    if (entry.isSymbolicLink()) throw new Error("SYMLINK_PROVENANCE_UNSUPPORTED: .control-glass/tdd-lock.json");
+    if (!entry.isFile()) throw new Error("INVALID_PROVENANCE_INPUT: .control-glass/tdd-lock.json");
+    files.push(lockFile);
+  }
+  return files.sort((first, second) => {
+    const left = relative(first);
+    const right = relative(second);
+    return left < right ? -1 : left > right ? 1 : 0;
+  });
+}
