@@ -1,9 +1,7 @@
-import { execSync } from "node:child_process";
-import fs from "node:fs";
-import path from "node:path";
+import { loadFeatureMap } from "./project-config.js";
+import { readGit, isDirectExecution } from "./runtime.js";
 
 export type ReviewTier = "Tier 0" | "Tier 1" | "Tier 2";
-
 export interface FeatureEntry {
   readonly id: string;
   readonly name: string;
@@ -13,152 +11,98 @@ export interface FeatureEntry {
   readonly contracts: readonly string[];
   readonly tests: readonly string[];
 }
-
-interface FeatureMapDoc {
-  readonly features?: readonly FeatureEntry[];
+export interface DiffOptions {
+  readonly baseRef?: string;
+  readonly headRef?: string;
+  readonly gatesPassed?: boolean;
 }
-
 export interface DiffReviewReport {
   readonly changedFiles: readonly string[];
-  readonly impactedFeatures: readonly {
-    readonly id: string;
-    readonly name: string;
-    readonly tier: ReviewTier;
-    readonly riskReason: string;
-  }[];
+  readonly impactedFeatures: readonly Pick<FeatureEntry, "id" | "name" | "tier" | "riskReason">[];
   readonly recommendedTier: ReviewTier;
   readonly routingDecision: string;
+  readonly status: "known" | "unavailable";
+  readonly errors: readonly string[];
 }
+const TIER_WEIGHT: Record<ReviewTier, number> = { "Tier 0": 0, "Tier 1": 1, "Tier 2": 2 };
 
-const TIER_WEIGHT: Record<ReviewTier, number> = {
-  "Tier 0": 0,
-  "Tier 1": 1,
-  "Tier 2": 2
-};
-
-function loadFeaturesSafe(rootDir: string): readonly FeatureEntry[] {
-  const featureMapPath = path.join(rootDir, "feature-map.json");
-  if (!fs.existsSync(featureMapPath)) {
-    return [];
-  }
-  try {
-    const parsed = JSON.parse(fs.readFileSync(featureMapPath, "utf8")) as FeatureMapDoc;
-    return parsed.features ?? [];
-  } catch {
-    return [];
-  }
-}
-
-function getChangedFilesFromGit(rootDir: string): string[] {
-  try {
-    const statusOut = execSync("git status --porcelain -uall", {
-      cwd: rootDir,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    });
-    const workingLines = statusOut
-      .split(/\r?\n/)
-      .filter((l) => l.trim().length > 0)
-      .map((line) => line.slice(3).trim().replace(/\\/g, "/"));
-
-    if (workingLines.length > 0) {
-      return workingLines;
+function readWorkingFiles(rootDir: string): { files: string[]; errors: string[] } {
+  const status = readGit(rootDir, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
+  if (!status.ok) return { files: [], errors: ["GIT_STATUS_UNAVAILABLE"] };
+  const records = status.value.split("\0");
+  const files: string[] = [];
+  for (let index = 0; index < records.length; index++) {
+    const record = records[index];
+    if (!record || record.length < 4) continue;
+    files.push(record.slice(3));
+    if (/^[RC]|^.[RC]/.test(record.slice(0, 2))) {
+      const origin = records[++index];
+      if (origin) files.push(origin);
     }
-
-    const headDiffOut = execSync("git diff --name-only HEAD~1 HEAD", {
-      cwd: rootDir,
-      encoding: "utf8",
-      stdio: ["ignore", "pipe", "ignore"]
-    });
-    return headDiffOut
-      .split(/\r?\n/)
-      .map((l) => l.trim().replace(/\\/g, "/"))
-      .filter((l) => l.length > 0);
-  } catch {
-    return [];
   }
+  return { files, errors: [] };
 }
 
-export function analyzeDiffAndTier(
-  rootDir: string = process.cwd(),
-  explicitChangedFiles?: readonly string[]
-): DiffReviewReport {
-  const features = loadFeaturesSafe(rootDir);
-  const changedFiles = explicitChangedFiles ?? getChangedFilesFromGit(rootDir);
-
-  let highestTier: ReviewTier = "Tier 0";
-  const impacted: DiffReviewReport["impactedFeatures"][number][] = [];
-
-  for (const file of changedFiles) {
-    if (
-      file.startsWith("src/core/") ||
-      file.startsWith("src/Core/") ||
-      file.startsWith("src/harness/") ||
-      file.endsWith("/contracts.ts") ||
-      file.endsWith("/contracts.py") ||
-      file.endsWith("/contracts.go") ||
-      file.endsWith("/Contracts.php")
-    ) {
-      highestTier = "Tier 2";
-    }
-    for (const feature of features) {
-      const allFeatureFiles = [...feature.entrypoints, ...feature.contracts, ...feature.tests];
-      if (allFeatureFiles.includes(file)) {
-        if (!impacted.some((i) => i.id === feature.id)) {
-          impacted.push({
-            id: feature.id,
-            name: feature.name,
-            tier: feature.tier,
-            riskReason: feature.riskReason
-          });
-        }
-        if (TIER_WEIGHT[feature.tier] > TIER_WEIGHT[highestTier]) {
-          highestTier = feature.tier;
-        }
+function readChangedFiles(rootDir: string, options: DiffOptions): { files: string[]; errors: string[] } {
+  const useEnvironment = rootDir === process.cwd();
+  const baseRef = options.baseRef ?? (useEnvironment ? process.env["CONTROL_GLASS_BASE_REF"] : undefined);
+  const headRef = options.headRef ?? (useEnvironment ? process.env["CONTROL_GLASS_HEAD_REF"] : undefined) ?? "HEAD";
+  if (baseRef !== undefined) {
+    if (baseRef.startsWith("-") || headRef.startsWith("-")) return { files: [], errors: ["INVALID_DIFF_REFERENCE"] };
+    const mergeBase = readGit(rootDir, ["merge-base", baseRef, headRef]);
+    if (!mergeBase.ok) return { files: [], errors: ["DIFF_BASE_UNAVAILABLE"] };
+    const diff = readGit(rootDir, ["diff", "--name-status", "-z", "--find-renames", mergeBase.value.trim(), headRef, "--"]);
+    if (!diff.ok) return { files: [], errors: ["GIT_DIFF_UNAVAILABLE"] };
+    const fields = diff.value.split("\0");
+    const files: string[] = [];
+    for (let index = 0; index < fields.length;) {
+      const status = fields[index++];
+      if (!status) continue;
+      const first = fields[index++];
+      if (first) files.push(first);
+      if (/^[RC]/.test(status)) {
+        const second = fields[index++];
+        if (second) files.push(second);
       }
     }
+    const working = readWorkingFiles(rootDir);
+    return { files: [...files, ...working.files], errors: working.errors };
   }
-
-  if (changedFiles.length > 0 && impacted.length === 0 && highestTier === "Tier 0") {
-    const onlyUi = changedFiles.every(
-      (f) =>
-        f.startsWith("src/ui/") ||
-        f.startsWith("src/components/") ||
-        f.startsWith("components/")
-    );
-    if (!onlyUi) {
-      highestTier = "Tier 1";
-    }
-  }
-
-  const routingMap: Record<ReviewTier, string> = {
-    "Tier 0":
-      "AUTO-MERGE ELIGIBLE: Standard low-risk change verified by Control Glass. Zero human review bottleneck required.",
-    "Tier 1":
-      "TASK OWNER REVIEW: Moderate feature change. Route to Task Owner with Diff Consequence summary.",
-    "Tier 2":
-      "SENIOR / DOMAIN EXPERT REVIEW REQUIRED: Touches critical core contracts, verification harness, or Tier 2 high-risk domain logic."
-  };
-
-  return {
-    changedFiles,
-    impactedFeatures: impacted,
-    recommendedTier: highestTier,
-    routingDecision: routingMap[highestTier]
-  };
+  if (useEnvironment && process.env["CI"] === "true") return { files: [], errors: ["CI_REQUIRES_EXPLICIT_BASE_REF"] };
+  return readWorkingFiles(rootDir);
 }
 
-if (process.argv[1]?.endsWith("diff-reviewer.ts")) {
-  const report = analyzeDiffAndTier();
-  console.log("🔍 Diff & Consequence Review Orchestrator (Phase 3):");
-  console.log(
-    `  Changed Files (${report.changedFiles.length}):`,
-    report.changedFiles.join(", ") || "None (Clean working tree)"
-  );
-  console.log(`  Impacted Features (${report.impactedFeatures.length}):`);
-  for (const feat of report.impactedFeatures) {
-    console.log(`    - [${feat.tier}] ${feat.name}: ${feat.riskReason}`);
+export function analyzeDiffAndTier(rootDir: string = process.cwd(), explicitChangedFiles?: readonly string[], options: DiffOptions = {}): DiffReviewReport {
+  const changes = explicitChangedFiles === undefined ? readChangedFiles(rootDir, options) : { files: [...explicitChangedFiles], errors: [] };
+  const changedFiles = [...new Set(changes.files.map(file => file.replace(/\\/g, "/")))];
+  let features: readonly FeatureEntry[] = [];
+  try { features = loadFeatureMap(rootDir).features; }
+  catch { changes.errors.push("INVALID_FEATURE_MAP"); }
+  let highestTier: ReviewTier = changes.errors.length > 0 ? "Tier 2" : "Tier 0";
+  const impacted: DiffReviewReport["impactedFeatures"][number][] = [];
+  for (const file of changedFiles) {
+    const critical = /^src\/(?:core|Core|harness)\//.test(file) || /(?:^|\/)contracts\.(?:ts|py|go)$/i.test(file) || file.endsWith("/Contracts.php") || file === ".control-glass/tdd-lock.json" || ["feature-map.json", "control-glass.config.json", "AGENTS.md", "package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"].includes(file) || file.startsWith(".github/workflows/");
+    const ui = /^(?:src\/ui|src\/components|components)\//.test(file);
+    let fileTier: ReviewTier = critical ? "Tier 2" : ui ? "Tier 0" : "Tier 1";
+    for (const feature of features) {
+      if (![...feature.entrypoints, ...feature.contracts, ...feature.tests].includes(file)) continue;
+      if (!impacted.some(item => item.id === feature.id)) impacted.push({ id: feature.id, name: feature.name, tier: feature.tier, riskReason: feature.riskReason });
+      if (TIER_WEIGHT[feature.tier] > TIER_WEIGHT[fileTier]) fileTier = feature.tier;
+    }
+    if (TIER_WEIGHT[fileTier] > TIER_WEIGHT[highestTier]) highestTier = fileTier;
   }
-  console.log(`  🎯 Recommended Tier: ${report.recommendedTier}`);
-  console.log(`  🚦 Decision: ${report.routingDecision}`);
+  const status = changes.errors.length === 0 ? "known" : "unavailable";
+  const routingDecision = status === "unavailable" ? "REVIEW BLOCKED: Diff or feature configuration is unavailable."
+    : changedFiles.length === 0 ? "NO CHANGES: No merge approval was issued."
+    : highestTier === "Tier 2" ? "SENIOR / DOMAIN EXPERT REVIEW REQUIRED."
+    : highestTier === "Tier 1" ? "TASK OWNER REVIEW REQUIRED."
+    : options.gatesPassed === true ? "AUTO-MERGE ELIGIBLE: All required gates passed for this low-risk diff."
+    : "LOW-RISK CLASSIFICATION: All verification gates must pass before merge approval.";
+  return { changedFiles, impactedFeatures: impacted, recommendedTier: highestTier, routingDecision, status, errors: changes.errors };
+}
+
+if (isDirectExecution(import.meta.url)) {
+  const report = analyzeDiffAndTier();
+  console.log(JSON.stringify(report, null, 2));
+  if (report.status !== "known") process.exitCode = 1;
 }

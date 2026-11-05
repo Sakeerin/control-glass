@@ -22,18 +22,23 @@ export { runSafetyGate, type SafetyFinding } from "./harness/safety-gate.js";
 export {
   verifyTddLock,
   writeTddLockManifest,
+  type SpecFreezeOptions,
   type TddLockManifest
 } from "./harness/tdd-guard.js";
 export {
   analyzeDiffAndTier,
   type DiffReviewReport,
+  type DiffOptions,
   type ReviewTier
 } from "./harness/diff-reviewer.js";
 export {
   runControlGlass,
   resolvePolyglotGateCommands,
   type EmpiricalEvidenceArtifact,
-  type PolyglotGateCommands
+  type PolyglotGateCommands,
+  type GateStatus,
+  type CommandGateResult,
+  type ControlGlassOptions
 } from "./harness/control-glass.js";
 export {
   buildDependencyGraph,

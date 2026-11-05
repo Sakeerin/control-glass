@@ -20,7 +20,7 @@ Once installed, restart your editor to discover:
 - **`/control-glass-mode`** — Front-door task router & playbook orchestrator
 - **`setup-control-glass`** — One-command project bootstrapper
 - **`pac-tdd-workflow`** — Contract-first & SHA-256 locked TDD workflow
-- **`control-glass-verify`** — 6-gate empirical verification runner
+- **`control-glass-verify`** — 7-gate empirical verification runner
 - **`dune-gardener`** — Anti-pattern elimination & AST rule authoring
 - **`diff-consequence-reviewer`** — Automated Tier 0 / Tier 1 / Tier 2 PR triage
 
@@ -28,7 +28,7 @@ Once installed, restart your editor to discover:
 
 ## 2. Install as a CLI & Library in Your TypeScript Project
 
-To enforce the 6 deterministic gates (Typecheck, Dune AST Linter, Safety/Secret Gate, TDD Immutability Lock, Vitest, and Tiered Diff Routing) in your own project:
+To enforce the 7 verification stages (configured static checks, Dune AST Linter, Deslop, Safety/Secret Gate, TDD Immutability Lock, configured tests, and Tiered Diff Routing) in your own project:
 
 ```bash
 npm install --save-dev github:Sakeerin/control-glass

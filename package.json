@@ -44,8 +44,9 @@
     "test": "vitest run",
     "verify": "tsx src/harness/control-glass.ts",
     "review:diff": "tsx src/harness/diff-reviewer.ts",
-    "lock:tests": "tsx src/harness/tdd-guard.ts --update-lock",
-    "cli": "tsx src/harness/cli.ts"
+    "lock:tests": "tsx src/harness/tdd-guard.ts --update-lock --phase=spec-freeze",
+    "cli": "tsx src/harness/cli.ts",
+    "prepare": "npm run build"
   },
   "keywords": [
     "ai-agent",

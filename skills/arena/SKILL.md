@@ -16,4 +16,4 @@ Use this skill when designing a new subsystem or refactoring complex domain logi
    - **Zero-Indirection Simplicity (20 pts):** Does it follow the Single Paved Path without speculative abstractions or wrapper classes?
    - **Empirical Testability (10 pts):** Can it be verified deterministically in `< 10ms` with zero mocks/I/O?
 3. **Declare the Winner & Freeze Spec:**
-   - Select the highest-scoring design, write its contracts into `src/core/contracts.ts`, lock the tests (`npx control-glass lock`), and proceed to implementation.
+   - Select the highest-scoring design, write its contracts into `src/core/contracts.ts`, lock the tests (`npx control-glass lock --phase=spec-freeze`), and proceed to implementation.

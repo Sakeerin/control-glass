@@ -6,7 +6,7 @@ Copy this checklist verbatim before writing any code:
   - Locate the affected feature in `feature-map.json` via its entrypoint, contract, or DOM selector.
 - [ ] **Step 2: Deterministic Reproduction (Red Test Lock)**
   - Add a failing reproduction test in `tests/*.spec.ts` that captures the exact bug.
-  - Freeze the updated test suite using `npx control-glass lock` (`npm run lock:tests`).
+  - Freeze the updated test suite using `npx control-glass lock --phase=spec-freeze` (`npm run lock:tests`).
 - [ ] **Step 3: Root-Cause Fix & Atomic Rollback Discipline**
   - Fix the root cause in `src/` without touching the locked test file and without adding band-aid comments.
   - If a hypothesis fails, revert the exploratory changes completely before trying another approach.

@@ -7,7 +7,7 @@ Copy this checklist verbatim before writing any code:
 - [ ] **Step 2: Phase 1 Spec Freeze & Branded Contract Design**
   - Define Branded Types (`Brand<T, Name>`) and `Result<T, E>` signatures in `src/core/contracts.ts`.
   - Author red-phase unit and contract tests in `tests/<feature>.spec.ts`.
-  - Run `npx control-glass lock` (or `npm run lock:tests`) to freeze SHA-256 hashes in `.control-glass/tdd-lock.json`.
+  - Run `npx control-glass lock --phase=spec-freeze` (or `npm run lock:tests`) to freeze SHA-256 hashes in `.control-glass/tdd-lock.json`.
 - [ ] **Step 3: Phase 2 Single Paved Path Implementation**
   - Implement the feature in `src/features/` or `src/ui/` without modifying locked test files.
   - Strictly obey Dune rules: zero comments, zero `any`, zero `console.*`, and strict boundary imports.

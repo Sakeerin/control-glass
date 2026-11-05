@@ -1,4 +1,4 @@
-# 03 — Dune Architecture & The 6 Verification Gates
+# 03 — Dune Architecture & The 7 Verification Gates
 
 `control-glass` enforces the **Continuum of Control** by pushing rules out of fragile human code reviews (Level 4) and down into **Data Structures (Level 1)** and **Static AST Analysis (Level 2)**.
 
@@ -32,7 +32,7 @@ Why? Because in the *Mars Climate Orbiter* disaster, passing a raw `number` allo
 
 ## Phase 1 & 2 Guardrails (`npx control-glass tdd-check` & `safety`)
 
-* **Anti-Closed-Loop Testing (`tdd-guard.ts`)**: When an AI writes both code and tests simultaneously, it often weakens the test assertion to make buggy code pass. `npx control-glass lock` records SHA-256 hashes of `tests/*.spec.ts` and `src/core/contracts.ts`. During implementation, any unauthorized edit to those files triggers a `TDD_LOCK` failure.
+* **Anti-Closed-Loop Testing (`tdd-guard.ts`)**: When an AI writes both code and tests simultaneously, it often weakens the test assertion to make buggy code pass. `npx control-glass lock --phase=spec-freeze` records SHA-256 hashes of `tests/*.spec.ts` and `src/core/contracts.ts`. During implementation, any unauthorized edit to those files triggers a `TDD_LOCK` failure.
 * **Safety & Secret Gate (`safety-gate.ts`)**: Scans for leaked credentials (`sk-...`, `sk-proj-...`, `ghp_...`, `AKIA...`, private keys) and blocks destructive SQL/shell operations (`DROP TABLE`, `TRUNCATE TABLE`, `rm -rf`, `eval()`).
 
 ---

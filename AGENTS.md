@@ -20,8 +20,8 @@
 6. **Least Privilege:** Never hardcode credentials, tokens, or execute destructive shell/database commands (`DROP TABLE`, `rm -rf`, ` truncate `).
 
 ## 3. Progressive Disclosure (Skills & Playbooks)
-For detailed workflows, read the skills in `.agent/skills/`:
-- `.agent/skills/pac-tdd-workflow/SKILL.md` — Phase 1 Spec Freeze -> Red Test -> Green Implementation.
-- `.agent/skills/control-glass-verify/SKILL.md` — Empirical verification & evidence collection.
-- `.agent/skills/dune-gardener/SKILL.md` — Eliminating tech debt & writing AST lint rules to "stop the bleeding".
-- `.agent/skills/diff-consequence-reviewer/SKILL.md` — Sub-agent Diff analysis & Tiered Review routing.
+For detailed workflows, read the skills in `skills/`:
+- `skills/pac-tdd-workflow/SKILL.md` — Phase 1 Spec Freeze -> Red Test -> Green Implementation.
+- `skills/control-glass-verify/SKILL.md` — Empirical verification & evidence collection.
+- `skills/dune-gardener/SKILL.md` — Eliminating tech debt & writing AST lint rules to "stop the bleeding".
+- `skills/diff-consequence-reviewer/SKILL.md` — Sub-agent Diff analysis & Tiered Review routing.

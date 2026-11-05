@@ -1,6 +1,6 @@
 # 04 — Multi-Vendor AI Support (Claude, OpenAI, Gemini, Cursor, Copilot, Windsurf & MCP)
 
-`control-glass` is 100% vendor-agnostic. Whether a developer on your team uses **Anthropic Claude Code**, **OpenAI Codex / ChatGPT**, **Google Gemini / Antigravity**, **Cursor**, **GitHub Copilot**, or **Windsurf**, `control-glass` enforces the exact same **Michelin Kitchen** playbooks and 6 deterministic verification gates.
+`control-glass` is 100% vendor-agnostic. Whether a developer on your team uses **Anthropic Claude Code**, **OpenAI Codex / ChatGPT**, **Google Gemini / Antigravity**, **Cursor**, **GitHub Copilot**, or **Windsurf**, `control-glass` enforces the exact same **Michelin Kitchen** playbooks and 7 verification stages.
 
 ---
 
@@ -42,11 +42,10 @@ Add this to your client's `mcp_config.json` or `claude_desktop_config.json`:
 ```
 
 ### Exposed MCP Native Tools:
-- `control_glass_verify_gates` — Runs Dune AST Linter, Safety Gate, TDD SHA-256 Lock, and Diff Tier classification.
+- `control_glass_verify_gates` — Runs the complete CLI pipeline, including configured static checks, Deslop, safety, trusted TDD locks, tests, and diff classification.
 - `control_glass_map_dependencies` — Builds the AST Dependency & Export Graph (`.control-glass/dependency-graph.json`).
 - `control_glass_deslop` — Scans and strips AI comment slop and empty catch blocks.
 - `control_glass_diff_tier` — Computes blast radius and returns `Tier 0`, `Tier 1`, or `Tier 2`.
-- `control_glass_lock_tests` — Freezes SHA-256 hashes of tests and contracts.
 - `control_glass_bench` — Runs empirical ops/sec and V8 heap benchmarks.
 
 ---
@@ -72,3 +71,5 @@ Check active vendor environment keys at any time via:
 ```bash
 npx control-glass vendors
 ```
+
+The LLM adapter builds provider-specific request payloads. HTTP transport, streaming, retries, and response processing belong to the caller. See [verification contract and migration](06-verification-contract.md) for MCP, lock approval, and consumer CI behavior.

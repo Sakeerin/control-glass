@@ -16,13 +16,13 @@ flowchart LR
     Router -->|Tech Debt / Weed| P3["playbooks/gardener.md"]
     Router -->|PR Review / Diff| P4["playbooks/review.md"]
     P1 & P2 & P3 & P4 --> Checklist["Copies Steps Verbatim into Todo List"]
-    Checklist --> Verify["Runs npx control-glass verify (6 Gates)"]
+    Checklist --> Verify["Runs npx control-glass verify (7 Gates)"]
 ```
 
 1. **Matches the Right Playbook:** It classifies your request into Feature Development (`feature.md`), Bug Fixing (`bug.md`), Tech Debt Gardening (`gardener.md`), or PR Diff Review (`review.md`).
 2. **Copies Steps Verbatim:** Before touching a single line of code, the agent copies the playbook's checklist verbatim into its plan. This prevents the agent from skipping `feature-map.json` lookup or bypassing the **Phase 1 TDD SHA-256 Lock**.
 3. **Orchestrates Companion Skills:** As it works through the checklist, it invokes `pac-tdd-workflow`, `dune-gardener`, `diff-consequence-reviewer`, and `control-glass-verify`.
-4. **Proves It Empirically:** The task cannot finish until `npx control-glass verify` passes all 6 gates and writes `.control-glass/evidence-latest.json`.
+4. **Proves It Empirically:** The task cannot finish until `npx control-glass verify` passes all 7 gates and writes `.control-glass/evidence-latest.json`.
 
 ---
 
@@ -36,7 +36,7 @@ State **what** you want to achieve and **how to verify it**, then let `/control-
 **What the agent will do automatically:**
 1. Read `feature-map.json`.
 2. Add `TokensPerSecond` and `BurstCapacity` to `src/core/contracts.ts`.
-3. Write `tests/ratelimit.spec.ts` and run `npx control-glass lock` to freeze the SHA-256 hash.
+3. Write `tests/ratelimit.spec.ts` and run `npx control-glass lock --phase=spec-freeze` to freeze the SHA-256 hash.
 4. Implement the feature with zero comments and zero `any`.
 5. Run `npx control-glass verify` and report the Review Tier.
 

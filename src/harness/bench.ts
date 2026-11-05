@@ -1,3 +1,4 @@
+import { isDirectExecution } from "./runtime.js";
 import fs from "node:fs";
 import path from "node:path";
 import {
@@ -114,7 +115,7 @@ export function runPerformanceBenchmark(
   return report;
 }
 
-if (process.argv[1]?.endsWith("bench.ts")) {
+if (isDirectExecution(import.meta.url)) {
   const report = runPerformanceBenchmark();
   console.log("⚡ Control Glass Performance & Heap Hill-Climber:");
   for (const m of report.metrics) {

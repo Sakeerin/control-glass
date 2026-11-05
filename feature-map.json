@@ -4,17 +4,31 @@
   "architecturalBoundaries": {
     "ui": {
       "pathPrefix": "src/ui/",
-      "forbiddenImports": ["src/infra/", "node:fs", "node:child_process", "fs", "child_process"],
+      "forbiddenImports": [
+        "src/infra/",
+        "node:fs",
+        "node:child_process",
+        "fs",
+        "child_process",
+        "node:crypto",
+        "crypto"
+      ],
       "description": "Renderer / Presentation layer (must maintain 60-120 FPS, zero blocking I/O)"
     },
     "features": {
       "pathPrefix": "src/features/",
-      "forbiddenImports": ["node:child_process", "child_process"],
+      "forbiddenImports": [
+        "node:child_process",
+        "child_process"
+      ],
       "description": "Single Paved Path domain features using pure Branded Contracts"
     },
     "core": {
       "pathPrefix": "src/core/",
-      "forbiddenImports": ["src/ui/", "src/features/"],
+      "forbiddenImports": [
+        "src/ui/",
+        "src/features/"
+      ],
       "description": "Foundational Branded Types, Result monads, and interface contracts"
     }
   },
@@ -32,10 +46,24 @@
         "src/harness/safety-gate.ts",
         "src/harness/diff-reviewer.ts",
         "src/harness/auto-mapper.ts",
-        "src/harness/bench.ts"
+        "src/harness/bench.ts",
+        "src/harness/cli.ts",
+        "src/harness/hook-installer.ts",
+        "src/harness/file-inventory.ts",
+        "src/harness/runtime.ts",
+        "src/harness/project-config.ts",
+        "src/harness/source-analysis.ts",
+        "src/harness/module-resolver.ts"
       ],
-      "contracts": ["src/core/contracts.ts"],
-      "tests": ["tests/harness-guardrails.spec.ts"],
+      "contracts": [
+        "src/core/contracts.ts"
+      ],
+      "tests": [
+        "tests/harness-guardrails.spec.ts",
+        "tests/analysis-regressions.spec.ts",
+        "tests/control-regressions.spec.ts",
+        "tests/review-fixtures.contract.ts"
+      ],
       "domOrUiSelectors": [],
       "verificationCommand": "npm run verify"
     },
@@ -49,8 +77,15 @@
         "src/harness/vendor-sync.ts",
         "src/harness/mcp-server.ts"
       ],
-      "contracts": ["src/core/contracts.ts"],
-      "tests": ["tests/multi-vendor.spec.ts"],
+      "contracts": [
+        "src/core/contracts.ts"
+      ],
+      "tests": [
+        "tests/multi-vendor.spec.ts",
+        "tests/analysis-regressions.spec.ts",
+        "tests/control-regressions.spec.ts",
+        "tests/review-fixtures.contract.ts"
+      ],
       "domOrUiSelectors": [],
       "verificationCommand": "npm run verify"
     },
@@ -59,9 +94,18 @@
       "name": "Universal Polyglot Engine (TypeScript, React, Node.js, Python, Go, PHP)",
       "tier": "Tier 2",
       "riskReason": "Enforces Dune Linter, Deslop, Auto-Mapper, and SHA-256 TDD Locks across .ts, .tsx, .py, .go, and .php codebases.",
-      "entrypoints": ["src/harness/polyglot-engine.ts"],
-      "contracts": ["src/core/contracts.ts"],
-      "tests": ["tests/polyglot-engine.spec.ts"],
+      "entrypoints": [
+        "src/harness/polyglot-engine.ts"
+      ],
+      "contracts": [
+        "src/core/contracts.ts"
+      ],
+      "tests": [
+        "tests/polyglot-engine.spec.ts",
+        "tests/analysis-regressions.spec.ts",
+        "tests/control-regressions.spec.ts",
+        "tests/review-fixtures.contract.ts"
+      ],
       "domOrUiSelectors": [],
       "verificationCommand": "npm run verify"
     }

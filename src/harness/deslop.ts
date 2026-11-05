@@ -1,6 +1,8 @@
+import { isDirectExecution } from "./runtime.js";
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { typeScriptComments, replaceSourceRanges } from "./source-analysis.js";
 import {
   collectPolyglotSourceFiles,
   detectLanguageFromFile,
@@ -16,7 +18,8 @@ export interface SlopIssue {
     | "EMPTY_CATCH_BLOCK"
     | "TRIVIAL_PASS_THROUGH_WRAPPER"
     | "DEBUG_LEFTOVER"
-    | "SWALLOWED_ERROR_RESULT";
+    | "SWALLOWED_ERROR_RESULT"
+    | "INVALID_SOURCE";
   readonly description: string;
 }
 
@@ -27,60 +30,10 @@ export interface DeslopReport {
   readonly issues: readonly SlopIssue[];
 }
 
-function stripCommentsFromText(sourceText: string): {
-  readonly cleanedText: string;
-  readonly removedCount: number;
-} {
-  const hasShebang = sourceText.startsWith("#!");
-  const firstNewlineIdx = sourceText.indexOf("\n");
-  const shebangLine =
-    hasShebang && firstNewlineIdx !== -1 ? sourceText.slice(0, firstNewlineIdx + 1) : "";
-  const bodyText =
-    hasShebang && firstNewlineIdx !== -1 ? sourceText.slice(firstNewlineIdx + 1) : sourceText;
-
-  const scanner = ts.createScanner(
-    ts.ScriptTarget.Latest,
-    false,
-    ts.LanguageVariant.Standard,
-    bodyText
-  );
-
-  const rangesToRemove: Array<{ readonly start: number; readonly end: number }> = [];
-  let token = scanner.scan();
-  while (token !== ts.SyntaxKind.EndOfFileToken) {
-    if (
-      token === ts.SyntaxKind.SingleLineCommentTrivia ||
-      token === ts.SyntaxKind.MultiLineCommentTrivia
-    ) {
-      rangesToRemove.push({
-        start: scanner.getTokenPos(),
-        end: scanner.getTextPos()
-      });
-    }
-    token = scanner.scan();
-  }
-
-  if (rangesToRemove.length === 0) {
-    return { cleanedText: sourceText, removedCount: 0 };
-  }
-
-  let cursor = 0;
-  let result = "";
-  for (const range of rangesToRemove) {
-    result += bodyText.slice(cursor, range.start);
-    cursor = range.end;
-  }
-  result += bodyText.slice(cursor);
-
-  const normalizedLines = result
-    .split(/\r?\n/)
-    .filter((line, idx, arr) => !(line.trim() === "" && arr[idx - 1]?.trim() === ""))
-    .join("\n");
-
-  return {
-    cleanedText: shebangLine + normalizedLines,
-    removedCount: rangesToRemove.length
-  };
+function stripCommentsFromText(sourceText: string, fileName: string): { readonly cleanedText: string; readonly removedCount: number } {
+  const sourceFile = ts.createSourceFile(fileName, sourceText, ts.ScriptTarget.Latest, true, fileName.endsWith(".tsx") ? ts.ScriptKind.TSX : ts.ScriptKind.TS);
+  const ranges = typeScriptComments(sourceFile);
+  return { cleanedText: replaceSourceRanges(sourceText, ranges), removedCount: ranges.length };
 }
 
 function isTrivialPassThroughFunction(node: ts.FunctionDeclaration): boolean {
@@ -125,7 +78,16 @@ export function runDeslopEngine(
 
     if (lang === "typescript") {
       if (autoFixComments) {
-        const stripped = stripCommentsFromText(content);
+        const stripped = stripCommentsFromText(content, relPath);
+        const diagnostics = ts.transpileModule(stripped.cleanedText, {
+          fileName: relPath,
+          reportDiagnostics: true,
+          compilerOptions: { target: ts.ScriptTarget.ES2022, module: ts.ModuleKind.ESNext, jsx: ts.JsxEmit.Preserve }
+        }).diagnostics ?? [];
+        if (diagnostics.some(diagnostic => diagnostic.category === ts.DiagnosticCategory.Error)) {
+          issues.push({ file: relPath, line: 1, kind: "INVALID_SOURCE", description: "Autofix refused because the resulting source has syntax errors." });
+          continue;
+        }
         if (stripped.removedCount > 0) {
           fs.writeFileSync(absPath, stripped.cleanedText, "utf8");
           content = stripped.cleanedText;
@@ -208,7 +170,7 @@ export function runDeslopEngine(
   };
 }
 
-if (process.argv[1]?.endsWith("deslop.ts")) {
+if (isDirectExecution(import.meta.url)) {
   const fix = process.argv.includes("--fix");
   const report = runDeslopEngine(process.cwd(), fix);
   if (report.cleanedCommentCount > 0) {

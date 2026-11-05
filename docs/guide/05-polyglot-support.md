@@ -40,7 +40,7 @@ npx control-glass languages
 | **Dune Rule: `DUNE_NO_CONSOLE_IN_DOMAIN`** | Blocks `console.*` | Blocks `print(...)` | Blocks `fmt.Print*` | Blocks `var_dump`, `dd`, `print_r`, `echo` |
 | **Dune Rule: `DUNE_BOUNDARY_VIOLATION`** | `import` / `require()` | `import x` / `from x import y` | `import "..."` | `use Namespace\...;` / `require_once` |
 | **Deslop Engine (`npx control-glass deslop --fix`)** | Strips comments + flags `catch {}` & `debugger` | Strips `#` + flags `except: pass` & `breakpoint()` | Strips `//` + flags `_ = err` swallowed errors | Strips `//`, `#` + flags `catch (...) {}` & `xdebug_break()` |
-| **SHA-256 TDD Lock (`npx control-glass lock`)** | `*.spec.ts`, `*.test.ts`, `contracts.ts` | `test_*.py`, `*_test.py`, `contracts.py` | `*_test.go`, `contracts.go` | `*Test.php`, `Contracts.php` |
+| **SHA-256 TDD Lock (`npx control-glass lock --phase=spec-freeze`)** | `*.spec.ts`, `*.test.ts`, `contracts.ts` | `test_*.py`, `*_test.py`, `contracts.py` | `*_test.go`, `contracts.go` | `*Test.php`, `Contracts.php` |
 
 ---
 

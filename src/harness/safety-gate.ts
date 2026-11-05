@@ -1,5 +1,7 @@
+import { isDirectExecution } from "./runtime.js";
 import fs from "node:fs";
 import path from "node:path";
+import { collectProjectFiles } from "./file-inventory.js";
 
 export interface SafetyFinding {
   readonly file: string;
@@ -42,48 +44,12 @@ const SAFETY_PATTERNS: readonly PatternRule[] = [
   }
 ];
 
-function collectScannableFiles(dirPath: string): string[] {
-  if (!fs.existsSync(dirPath)) {
-    return [];
-  }
-  const entries = fs.readdirSync(dirPath, { withFileTypes: true });
-  const results: string[] = [];
-  for (const entry of entries) {
-    const full = path.join(dirPath, entry.name);
-    if (entry.isDirectory()) {
-      results.push(...collectScannableFiles(full));
-    } else if (
-      entry.isFile() &&
-      (entry.name.endsWith(".ts") ||
-        entry.name.endsWith(".tsx") ||
-        entry.name.endsWith(".py") ||
-        entry.name.endsWith(".go") ||
-        entry.name.endsWith(".php") ||
-        entry.name.endsWith(".json"))
-    ) {
-      results.push(full);
-    }
-  }
-  return results;
-}
-
 export function runSafetyGate(rootDir: string = process.cwd()): {
   readonly passed: boolean;
   readonly scannedFiles: number;
   readonly findings: readonly SafetyFinding[];
 } {
-  const targetDirs = [
-    path.join(rootDir, "src"),
-    path.join(rootDir, "app"),
-    path.join(rootDir, "pages"),
-    path.join(rootDir, "components"),
-    path.join(rootDir, "server"),
-    path.join(rootDir, "lib"),
-    path.join(rootDir, "pkg"),
-    path.join(rootDir, "internal"),
-    path.join(rootDir, "tests")
-  ];
-  const files = targetDirs.flatMap((d) => collectScannableFiles(d));
+  const files = collectProjectFiles(rootDir);
   const findings: SafetyFinding[] = [];
 
   for (const filePath of files) {
@@ -113,7 +79,7 @@ export function runSafetyGate(rootDir: string = process.cwd()): {
   };
 }
 
-if (process.argv[1]?.endsWith("safety-gate.ts")) {
+if (isDirectExecution(import.meta.url)) {
   const res = runSafetyGate();
   if (!res.passed) {
     console.error(`❌ Safety & Secret Gate failed with ${res.findings.length} finding(s):`);

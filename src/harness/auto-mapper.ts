@@ -1,6 +1,8 @@
+import { isDirectExecution } from "./runtime.js";
 import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
+import { loadCompilerOptions, resolveProjectImport } from "./module-resolver.js";
 import {
   collectPolyglotSourceFiles,
   detectLanguageFromFile,
@@ -31,17 +33,6 @@ function classifyLayer(relPath: string): FileDependencyNode["layer"] {
   if (lower.startsWith("src/harness/")) return "harness";
   if (lower.startsWith("src/vendors/")) return "vendors";
   return "other";
-}
-
-function resolveImportToRelPath(importerRel: string, spec: string): string {
-  if (!spec.startsWith(".")) {
-    return spec;
-  }
-  const dir = path.posix.dirname(importerRel);
-  const normalized = path.posix.normalize(path.posix.join(dir, spec));
-  return normalized.endsWith(".js")
-    ? normalized.slice(0, -3) + ".ts"
-    : normalized;
 }
 
 function hasExportModifier(node: ts.Node): boolean {
@@ -85,6 +76,7 @@ function extractNonTsExports(
 
 export function buildDependencyGraph(rootDir: string = process.cwd()): DependencyGraphArtifact {
   const srcFiles = collectPolyglotSourceFiles(rootDir);
+  const compilerOptions = loadCompilerOptions(rootDir);
   const rawImports: Record<string, string[]> = {};
   const rawExports: Record<string, string[]> = {};
   const fileLangs: Record<string, SupportedLanguage> = {};
@@ -112,34 +104,31 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
         scriptKind
       );
 
-      sf.forEachChild((node) => {
-        if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-          const target = resolveImportToRelPath(relPath, node.moduleSpecifier.text);
-          rawImports[relPath]?.push(target);
-          if (!reverseImports[target]) {
-            reverseImports[target] = new Set();
-          }
-          reverseImports[target]?.add(relPath);
+      const recordImport = (specifier: string): void => {
+        const target = resolveProjectImport(rootDir, relPath, specifier, compilerOptions);
+        if (!rawImports[relPath]?.includes(target)) rawImports[relPath]?.push(target);
+        if (!reverseImports[target]) reverseImports[target] = new Set();
+        reverseImports[target]?.add(relPath);
+      };
+      const visit = (node: ts.Node): void => {
+        if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) recordImport(node.moduleSpecifier.text);
+        if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression && ts.isStringLiteral(node.moduleReference.expression)) recordImport(node.moduleReference.expression.text);
+        if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === "require"))) {
+          const first = node.arguments[0];
+          if (first && ts.isStringLiteral(first)) recordImport(first.text);
         }
-
+        if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
+          for (const element of node.exportClause.elements) rawExports[relPath]?.push(element.name.text);
+        }
         if (hasExportModifier(node)) {
-          if (
-            (ts.isFunctionDeclaration(node) ||
-              ts.isInterfaceDeclaration(node) ||
-              ts.isTypeAliasDeclaration(node) ||
-              ts.isClassDeclaration(node)) &&
-            node.name
-          ) {
-            rawExports[relPath]?.push(node.name.text);
-          } else if (ts.isVariableStatement(node)) {
-            for (const decl of node.declarationList.declarations) {
-              if (ts.isIdentifier(decl.name)) {
-                rawExports[relPath]?.push(decl.name.text);
-              }
-            }
+          if ((ts.isFunctionDeclaration(node) || ts.isInterfaceDeclaration(node) || ts.isTypeAliasDeclaration(node) || ts.isClassDeclaration(node)) && node.name) rawExports[relPath]?.push(node.name.text);
+          else if (ts.isVariableStatement(node)) {
+            for (const declaration of node.declarationList.declarations) if (ts.isIdentifier(declaration.name)) rawExports[relPath]?.push(declaration.name.text);
           }
         }
-      });
+        ts.forEachChild(node, visit);
+      };
+      visit(sf);
     } else {
       for (const line of content.split(/\r?\n/)) {
         for (const imp of extractImportsFromLine(line, lang)) {
@@ -179,7 +168,7 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
   return artifact;
 }
 
-if (process.argv[1]?.endsWith("auto-mapper.ts")) {
+if (isDirectExecution(import.meta.url)) {
   const graph = buildDependencyGraph();
   console.log(
     `🗺️  Auto-Mapper built Polyglot AST dependency graph (${graph.totalFiles} files mapped -> .control-glass/dependency-graph.json).`

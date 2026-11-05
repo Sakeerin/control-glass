@@ -16,7 +16,7 @@
 | **No Weak Types (`DUNE_NO_EXPLICIT_ANY`)** | บล็อก `any`, `as unknown` | บล็อก `typing.Any` | บล็อก `interface{}`, `any` | บล็อก `mixed` & บังคับ `declare(strict_types=1);` |
 | **No Debug Output (`DUNE_NO_CONSOLE_IN_DOMAIN`)** | บล็อก `console.*` | บล็อก `print(...)` | บล็อก `fmt.Print*` | บล็อก `var_dump`, `dd`, `print_r`, `echo` |
 | **Deslop Engine (`npx control-glass deslop --fix`)** | ลบคอมเมนต์ + ดัก `catch {}` & `debugger` | ลบ `#` + ดัก `except: pass` & `breakpoint()` | ลบ `//` + ดัก `_ = err` | ลบ `//`, `#` + ดัก `catch (...) {}` & `xdebug_break()` |
-| **SHA-256 TDD Lock (`npx control-glass lock`)** | `*.spec.ts`, `*.test.tsx`, `contracts.ts` | `test_*.py`, `*_test.py`, `contracts.py` | `*_test.go`, `contracts.go` | `*Test.php`, `Contracts.php` |
+| **SHA-256 TDD Lock (`npx control-glass lock --phase=spec-freeze`)** | `*.spec.ts`, `*.test.tsx`, `contracts.ts` | `test_*.py`, `*_test.py`, `contracts.py` | `*_test.go`, `contracts.go` | `*Test.php`, `Contracts.php` |
 
 สามารถสร้างไฟล์ตั้งต้น Branded Contracts สำหรับแต่ละภาษาได้ทันทีด้วย:
 ```bash
@@ -38,11 +38,11 @@ npx control-glass init --lang all      # สร้างครบทุกภา
    * **Cursor IDE:** สร้าง `.cursor/rules/control-glass.mdc` และ `plugin.json`
    * **GitHub Copilot:** สร้าง `.github/copilot-instructions.md`
    * **Windsurf:** สร้าง `.windsurfrules`
-   * **Google Antigravity:** สร้าง `.agent/rules/`, `.agent/skills/` และ `plugin.json`
+   * **Google Antigravity:** สร้าง `.agent/rules/`, `.agent/skills/`, `skills/` และ `plugin.json`
 2. **🔌 Universal MCP Server (`npx control-glass mcp`):**
-   * เปิดให้ Claude Desktop, Claude Code, OpenAI Agents SDK, Cursor หรือ IDE ใดๆ เรียกใช้ด่านตรวจของ `control-glass` (`control_glass_verify_gates`, `control_glass_deslop`, `control_glass_map_dependencies`, `control_glass_diff_tier`, `control_glass_lock_tests`, `control_glass_bench`) เป็น **Native MCP Tools** ได้ทันที
+   * เปิดเครื่องมือตรวจครบ 7 ด่านผ่าน `control_glass_verify_gates` โดยใช้ pipeline เดียวกับ CLI พร้อมเครื่องมือ dependency map, deslop, diff, benchmark และตรวจภาษา ส่วนการเปลี่ยน test lock ต้องทำผ่าน CLI ใน Phase 1 อย่างชัดเจน
 3. **🤖 Multi-Vendor LLM Gateway (`src/vendors/llm-gateway.ts`):**
-   * โมดูล Type-safe สำหรับเชื่อมต่อ API ของ **Anthropic (`claude-3-7-sonnet`), OpenAI (`gpt-4o`), Google (`gemini-2.5-pro`), และ OpenAI-Compatible (`Ollama / DeepSeek / OpenRouter`)** เพื่อใช้ทำ Multi-Model `/arena` หรือ Cross-Vendor `/interrogate`
+   * โมดูล Type-safe สำหรับสร้าง request payload ของ **Anthropic (`claude-3-7-sonnet`), OpenAI (`gpt-4o`), Google (`gemini-2.5-pro`), และ OpenAI-Compatible (`Ollama / DeepSeek / OpenRouter`)** เพื่อใช้ทำ Multi-Model `/arena` หรือ Cross-Vendor `/interrogate`
 
 ---
 
@@ -57,14 +57,14 @@ npx control-glass init --lang all      # สร้างครบทุกภา
 | **Front-Door Router & Playbooks** | `/poteto-mode` (Markdown) | **`/control-glass-mode`** (5 Playbooks: `feature`, `bug`, `perf`, `gardener`, `review`) |
 | **Polyglot Language Support** | ไม่มีการตรวจระดับภาษา | **4 ภาษาหลัก:** รองรับ **TypeScript (`.ts`), Python (`.py`), Go (`.go`), และ PHP (`.php`)** พร้อม Branded Contract Generator |
 | **Multi-Vendor AI Support** | รองรับเฉพาะ Cursor | **Universal:** รองรับ Claude Code, OpenAI Codex, Cursor, Copilot, Windsurf, Antigravity + **MCP Server** |
-| **Code Comprehension (`/how`, `/why`)** | ให้ AI นั่งอ่านโค้ดสดทุกครั้ง (เปลือง Token) | **`/how-why` + `npx control-glass map`** สร้าง Polyglot Dependency Graph (`.control-glass/dependency-graph.json`) แม่นยำ 100% |
+| **Code Comprehension (`/how`, `/why`)** | ให้ AI นั่งอ่านโค้ดสดทุกครั้ง (เปลือง Token) | **`/how-why` + `npx control-glass map`** สร้าง Polyglot Dependency Graph (`.control-glass/dependency-graph.json`) ตามการ resolve โมดูลที่รองรับ |
 | **Diff Hygiene (`/deslop`)** | สั่ง Prompt ให้ AI ช่วยดูโค้ดขยะ | **`/deslop` + `npx control-glass deslop --fix`** ลบคอมเมนต์อัตโนมัติในทั้ง 4 ภาษา และดักจับ `catch {}` ว่าง, `except: pass`, `_ = err`, `debugger`, และ Trivial Wrapper |
 | **Boundary & Suppression Lock** | ❌ ไม่มี | **Polyglot Dune Linter:** ดักจับการ Import ข้าม Boundary ในทุกภาษา และบล็อก `@ts-ignore`, `# type: ignore`, `//nolint`, `@phpstan-ignore` |
 | **Design Competition (`/arena`)** | อภิปรายเปรียบเทียบด้วยทฤษฎี | **`/arena`** ให้คะแนน 0–100 ตามเกณฑ์ Continuum of Control (Branded Types, Boundary Isolation, Tier Impact) |
 | **Adversarial Review (`/interrogate`)** | ถาม-ตอบทั่วไป | **`/interrogate` + `agents/interrogator.md`** ตรวจสอบกับ 4 กรณีศึกษาหายนะจริง (*Mars Orbiter, Knight Capital, Google Cloud, CrowdStrike*) |
 | **Anti-Closed-Loop Testing** | ❌ ไม่มี (AI แก้เทสต์ตัวเองได้) | ✅ **Recursive SHA-256 TDD Lock (`tdd-guard.ts`)** ล็อกทั้ง `*.spec.ts`, `test_*.py`, `*_test.go`, `*Test.php` และไฟล์ Contracts ทุกโฟลเดอร์ย่อย |
 | **Performance Hill-Climbing** | สั่งด้วย Prompt | ✅ **`npx control-glass bench`** วัด ops/sec และ V8 Heap Memory Delta จริง (พร้อม API `measureWorkload`) |
-| **Zero-Bypass Enforcement** | ❌ ลืมเรียกสกิล = หลุดเข้า Git | ✅ **`npx control-glass install-hooks`** ฝัง Git `pre-commit` hook + GitHub Actions CI บล็อกอัตโนมัติ |
+| **Git Hook & CI Gate** | ❌ ลืมเรียกสกิล = หลุดเข้า Git | ✅ **`npx control-glass install-hooks`** ฝัง Git `pre-commit` hook + GitHub Actions CI บล็อกอัตโนมัติ |
 
 ---
 
@@ -170,7 +170,7 @@ export type OrderId = Brand<string, "OrderId">;
 | `npx control-glass lint` | `npm run lint:dune` | รัน Dune AST Linter ตรวจจับ Comment, `@ts-ignore`, การแหกกฎ Boundary Import, และการใช้ `any` |
 | `npx control-glass safety` | `npm run guard:safety` | สแกนหา API Keys/Secrets รั่วไหล และคำสั่งอันตรายในโค้ด |
 | `npx control-glass tdd-check` | `npm run guard:tdd` | ตรวจสอบว่าไฟล์ Test และ Contract ไม่ถูกแอบแก้ไขระหว่างที่ AI เขียนโค้ด |
-| `npx control-glass lock` | `npm run lock:tests` | อัปเดตค่า SHA-256 Lock ใน `.control-glass/tdd-lock.json` *(ใช้ใน Phase 1 ตอนล็อกสเปก)* |
+| `npx control-glass lock --phase=spec-freeze` | `npm run lock:tests` | อัปเดตค่า SHA-256 Lock ใน `.control-glass/tdd-lock.json` *(ใช้ใน Phase 1 ตอนล็อกสเปก)* |
 | `npx control-glass diff` | `npm run review:diff` | วิเคราะห์ไฟล์ที่เปลี่ยนแปลงใน Git เทียบกับ `feature-map.json` เพื่อจัดระดับ `Tier 0 / 1 / 2` |
 | `npx control-glass install-hooks` | `npm run install:hooks` | ติดตั้ง Git `pre-commit` hook และสร้างไฟล์ `.github/workflows/control-glass.yml` |
 
@@ -226,3 +226,7 @@ control-glass/
 
 ## 📄 สัญญาอนุญาต (License)
 เผยแพร่ภายใต้สัญญาอนุญาต **[MIT License](./LICENSE)**
+
+## Verification contract and migration
+
+See [06 — Verification contract and migration](docs/guide/06-verification-contract.md) for fail-closed checks, consumer test commands, explicit PR ranges, trusted TDD baselines, preserved configurations, and CI requirements.

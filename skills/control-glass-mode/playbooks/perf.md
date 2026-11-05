@@ -10,5 +10,5 @@ Copy this checklist verbatim when optimizing performance or eliminating memory l
   - Apply one atomic optimization at a time in `src/`.
   - Re-run `npx control-glass bench` after each change.
   - **Atomic Rollback Rule:** If `opsPerSecond` regresses or `heapDeltaBytes` increases without justification, revert the change immediately.
-- [ ] **Step 4: Full 6-Gate Verification**
+- [ ] **Step 4: Full 7-Gate Verification**
   - Run `npx control-glass verify` (`npm run verify`) to confirm Typecheck, Dune AST Linter, Safety Gate, TDD Lock, and Unit Tests all pass alongside the improved benchmark.

@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 import fs from "node:fs";
 import path from "node:path";
+import { isDirectExecution } from "./runtime.js";
 import {
   buildVendorRequestPayload,
   createVendorModelConfig,
@@ -29,7 +30,7 @@ const DEFAULT_FEATURE_MAP = {
   architecturalBoundaries: {
     ui: {
       pathPrefix: "src/ui/",
-      forbiddenImports: ["src/infra/", "node:fs", "node:child_process", "fs", "child_process"],
+      forbiddenImports: ["src/infra/", "node:fs", "node:child_process", "node:crypto", "fs", "child_process", "crypto"],
       description: "Renderer / Presentation layer (must maintain 60-120 FPS, zero blocking I/O)"
     },
     features: {
@@ -57,7 +58,7 @@ const DEFAULT_AGENTS_MD = `# AGENTS.md — Control Glass (Michelin Kitchen & Bot
 - \`npx control-glass map\` — Auto-build AST dependency graph (\`.control-glass/dependency-graph.json\`).
 - \`npx control-glass bench\` — Run runtime & V8 heap delta benchmarks (\`.control-glass/bench-latest.json\`).
 - \`npx control-glass safety\` — Scans for leaked secrets and destructive operations.
-- \`npx control-glass lock\` — Locks SHA-256 hashes of tests and contracts during Phase 1 Spec Freeze.
+- \`npx control-glass lock --phase=spec-freeze\` — Locks SHA-256 hashes of tests and contracts during Phase 1 Spec Freeze.
 - \`npx control-glass diff\` — Generates Diff & Consequence Report and calculates Review Tier (\`Tier 0 | 1 | 2\`).
 - \`npx control-glass sync-vendors\` — Generates instructions & slash commands for Claude, OpenAI Codex, Cursor, Copilot, Windsurf, and MCP.
 - \`npx control-glass mcp\` — Starts the Universal Model Context Protocol (MCP) Server over stdio.
@@ -76,6 +77,7 @@ export function initControlGlassProject(
   requestedLang?: SupportedLanguage | "all"
 ): {
   readonly createdFiles: readonly string[];
+  readonly conflicts: readonly string[];
 } {
   const created: string[] = [];
   const featureMapPath = path.join(targetDir, "feature-map.json");
@@ -123,10 +125,12 @@ export function initControlGlassProject(
   const vendorReport = syncVendorConfigs(targetDir);
   created.push(...vendorReport.generatedFiles);
 
-  writeTddLockManifest(targetDir);
-  created.push(".control-glass/tdd-lock.json");
+  if (!fs.existsSync(path.join(targetDir, ".control-glass/tdd-lock.json"))) {
+    writeTddLockManifest(targetDir, { phase: "initialization" });
+    created.push(".control-glass/tdd-lock.json");
+  }
 
-  return { createdFiles: created };
+  return { createdFiles: created, conflicts: vendorReport.conflicts };
 }
 
 function printHelp(): void {
@@ -155,7 +159,7 @@ Commands:
 `);
 }
 
-if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) {
+if (isDirectExecution(import.meta.url)) {
   const cmd = process.argv[2] ?? "verify";
   const cwd = process.cwd();
 
@@ -166,7 +170,9 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
         langFlagIdx !== -1
           ? (process.argv[langFlagIdx + 1] as SupportedLanguage | "all" | undefined)
           : undefined;
+      if (langVal !== undefined && !["typescript", "ts", "python", "go", "php", "all"].includes(langVal)) throw new Error("UNSUPPORTED_LANGUAGE");
       const res = initControlGlassProject(cwd, langVal);
+      if (res.conflicts.length > 0) { console.error("Preserved conflicting files: " + res.conflicts.join(", ")); process.exitCode = 1; }
       console.log(`✅ Control Glass initialized (${res.createdFiles.length} files configured).`);
       break;
     }
@@ -178,6 +184,7 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
     }
     case "sync-vendors": {
       const report = syncVendorConfigs(cwd);
+      if (report.conflicts.length > 0) { console.error("Preserved conflicting files: " + report.conflicts.join(", ")); process.exitCode = 1; }
       console.log(
         `🌐 Synced Multi-Vendor AI configs (${report.syncedTargets.join(", ")}):\n  - ${report.generatedFiles.join("\n  - ")}`
       );
@@ -205,7 +212,12 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
       break;
     }
     case "verify": {
-      runControlGlass(cwd);
+      const baseIndex = process.argv.indexOf("--base");
+      const headIndex = process.argv.indexOf("--head");
+      const baseRef = baseIndex >= 0 ? process.argv[baseIndex + 1] : undefined;
+      const headRef = headIndex >= 0 ? process.argv[headIndex + 1] : undefined;
+      const report = runControlGlass(cwd, { ...(baseRef === undefined ? {} : { baseRef }), ...(headRef === undefined ? {} : { headRef }) });
+      if (!report.overallPassed) process.exitCode = 1;
       break;
     }
     case "lint": {
@@ -274,22 +286,27 @@ if (process.argv[1]?.endsWith("cli.ts") || process.argv[1]?.endsWith("cli.js")) 
       break;
     }
     case "lock": {
-      const manifest = writeTddLockManifest(cwd);
+      const manifest = writeTddLockManifest(cwd, process.argv.includes("--phase=spec-freeze") ? { phase: "spec-freeze" } : undefined);
       console.log(`🔒 TDD & Contract Lock updated (${Object.keys(manifest.files).length} files frozen).`);
       break;
     }
     case "diff": {
-      const report = analyzeDiffAndTier(cwd);
+      const baseIndex = process.argv.indexOf("--base");
+      const baseRef = baseIndex >= 0 ? process.argv[baseIndex + 1] : undefined;
+      const report = analyzeDiffAndTier(cwd, undefined, baseRef === undefined ? {} : { baseRef });
+      if (report.status !== "known") process.exitCode = 1;
       console.log(`🎯 Recommended Tier: ${report.recommendedTier}`);
       console.log(`🚦 Decision: ${report.routingDecision}`);
       break;
     }
     case "install-hooks": {
       const res = installGitAndCiHooks(cwd);
+      if (res.conflicts.length > 0) { console.error("Preserved conflicting files: " + res.conflicts.join(", ")); process.exitCode = 1; }
       console.log(`🔒 Installed Zero-Bypass Hooks & CI Gates: ${res.installedPaths.join(", ")}`);
       break;
     }
     default: {
+      if (!["help", "--help", "-h"].includes(cmd)) process.exitCode = 1;
       printHelp();
       break;
     }

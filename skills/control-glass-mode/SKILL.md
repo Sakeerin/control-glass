@@ -1,6 +1,6 @@
 ---
 name: control-glass-mode
-description: Primary front-door router skill (inspired by pstack /poteto-mode). Matches engineering tasks to Michelin Kitchen playbooks, copies verbatim checklists, and enforces 6-gate Control Glass verification.
+description: Primary front-door router skill (inspired by pstack /poteto-mode). Matches engineering tasks to Michelin Kitchen playbooks, copies verbatim checklists, and enforces 7-gate Control Glass verification.
 ---
 
 # Route Work Through `/control-glass-mode`
@@ -21,8 +21,8 @@ Whenever `/control-glass-mode` is invoked:
 3. **Orchestrate Specialized Skills & CLI:**
    - `/how-why` (`npx control-glass map`) — AST Dependency Graph & Git intent comprehension
    - `/arena` — Contract-driven design competition scored on the Continuum of Control
-   - `pac-tdd-workflow` (`npx control-glass lock`) — SHA-256 test & contract immutability lock
+   - `pac-tdd-workflow` (`npx control-glass lock --phase=spec-freeze`) — SHA-256 test & contract immutability lock
    - `/deslop` (`npx control-glass deslop --fix`) — AST slop detector & comment stripper
    - `/interrogate` — Adversarial red-team audit against the 4 Historical Disaster Safeguards
-   - `control-glass-verify` (`npx control-glass verify`) — Full 6-gate empirical verification
+   - `control-glass-verify` (`npx control-glass verify`) — Full 7-gate empirical verification
 4. **Empirical Proof Gate:** Never claim completion until `npx control-glass verify` exits with code `0` and produces `.control-glass/evidence-latest.json`.

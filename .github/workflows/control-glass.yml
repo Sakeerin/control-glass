@@ -1,31 +1,58 @@
+# control-glass-managed-workflow
 name: Control Glass Verification Gate
-
 on:
   push:
-    branches: [ main ]
+    branches: [main]
   pull_request:
-    branches: [ main ]
-
+    branches: [main]
+permissions:
+  contents: read
+env:
+  CONTROL_GLASS_BASE_REF: ${{ github.event.pull_request.base.sha || github.event.before }}
+  CONTROL_GLASS_HEAD_REF: ${{ github.event.pull_request.head.sha || github.sha }}
+  CONTROL_GLASS_APPROVED_LOCK_SHA256: ${{ vars.CONTROL_GLASS_APPROVED_LOCK_SHA256 }}
 jobs:
-  control-glass-verify:
+  verify:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Node.js 22
-        uses: actions/setup-node@v4
+          persist-credentials: false
+      - uses: actions/setup-node@v4
         with:
           node-version: "22"
-          cache: "npm"
-
-      - name: Install dependencies
+      - name: Install Node dependencies
+        if: hashFiles('package-lock.json') != ''
         run: npm ci
-
-      - name: Run Control Glass Pipeline
-        run: npm run verify
-
-      - name: Run Empirical Performance Benchmark
-        run: npm run bench
+      - name: Install consumer Node dependencies without a lock
+        if: hashFiles('package.json') != '' && hashFiles('package-lock.json') == ''
+        run: npm install
+      - name: Install standalone Control Glass for consumer projects
+        if: hashFiles('src/harness/control-glass.ts') == ''
+        run: |
+          npm install --prefix "$RUNNER_TEMP/control-glass-cli" --no-save --package-lock=false github:Sakeerin/control-glass
+          echo "$RUNNER_TEMP/control-glass-cli/node_modules/.bin" >> "$GITHUB_PATH"
+      - uses: actions/setup-python@v5
+        if: hashFiles('pyproject.toml', 'requirements.txt', 'mypy.ini') != ''
+        with:
+          python-version: "3.12"
+      - name: Install Python verification tools
+        if: hashFiles('pyproject.toml', 'requirements.txt', 'mypy.ini') != ''
+        run: |
+          python -m pip install mypy pytest
+          if [ -f requirements.txt ]; then python -m pip install -r requirements.txt; fi
+      - uses: actions/setup-go@v5
+        if: hashFiles('go.mod') != ''
+        with:
+          go-version-file: go.mod
+      - name: Install PHP dependencies and require declared verification tools
+        if: hashFiles('composer.json') != ''
+        run: |
+          php --version
+          composer install --no-interaction --prefer-dist
+          test -f vendor/bin/phpstan
+          test -f vendor/bin/phpunit
+      - name: Verify
+        run: |
+          if [ -f src/harness/control-glass.ts ]; then npm run verify; else control-glass verify; fi

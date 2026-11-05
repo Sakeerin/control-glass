@@ -13,7 +13,7 @@ Use this skill when building a new feature or modifying domain logic to prevent 
 
 ## Step 2: Red-Phase Test Authoring & Cryptographic Lock
 1. Write failing unit/contract tests in `tests/<feature>.spec.ts` that verify both nominal paths and edge cases.
-2. Run `npx control-glass lock` (`npm run lock:tests`) to record SHA-256 hashes of the contracts and tests in `.control-glass/tdd-lock.json`.
+2. Run `npx control-glass lock --phase=spec-freeze` (`npm run lock:tests`) to record SHA-256 hashes of the contracts and tests in `.control-glass/tdd-lock.json`.
 
 ## Step 3: Green-Phase Implementation (Single Paved Path)
 1. Implement the feature in `src/features/<domain>/` or `src/ui/` without touching the locked test files.

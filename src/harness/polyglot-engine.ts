@@ -1,5 +1,7 @@
 import fs from "node:fs";
 import path from "node:path";
+import { collectProjectFiles, isSourceFile, isTestFile } from "./file-inventory.js";
+import { tokenizeNonTypeScript, replaceSourceRanges } from "./source-analysis.js";
 
 export type SupportedLanguage = "typescript" | "python" | "go" | "php";
 
@@ -32,17 +34,6 @@ export interface BoundaryRule {
   readonly pathPrefix: string;
   readonly forbiddenImports: readonly string[];
 }
-
-const IGNORED_DIRS = new Set([
-  "node_modules",
-  "dist",
-  "vendor",
-  ".git",
-  ".venv",
-  "venv",
-  "__pycache__",
-  ".control-glass"
-]);
 
 export function detectLanguageFromFile(filePath: string): SupportedLanguage | null {
   if (filePath.endsWith(".ts") || filePath.endsWith(".tsx")) return "typescript";
@@ -78,69 +69,9 @@ export function detectProjectLanguages(rootDir: string = process.cwd()): readonl
   return Array.from(detected);
 }
 
-export function collectPolyglotSourceFiles(
-  rootDir: string,
-  subDirs: readonly string[] = [
-    "src",
-    "app",
-    "pages",
-    "components",
-    "server",
-    "lib",
-    "pkg",
-    "internal",
-    "cmd"
-  ]
-): string[] {
-  const results: string[] = [];
-
-  const walk = (dir: string): void => {
-    if (!fs.existsSync(dir)) return;
-    for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
-      if (IGNORED_DIRS.has(entry.name)) continue;
-      const full = path.join(dir, entry.name);
-      if (entry.isDirectory()) {
-        walk(full);
-      } else if (entry.isFile()) {
-        const lang = detectLanguageFromFile(entry.name);
-        const isTestFile =
-          entry.name.endsWith(".spec.ts") ||
-          entry.name.endsWith(".test.ts") ||
-          entry.name.endsWith(".spec.tsx") ||
-          entry.name.endsWith(".test.tsx") ||
-          entry.name.endsWith("_test.py") ||
-          entry.name.startsWith("test_") ||
-          entry.name.endsWith("_test.go") ||
-          entry.name.endsWith("Test.php");
-        if (lang && !isTestFile) {
-          results.push(full);
-        }
-      }
-    }
-  };
-
-  for (const sub of subDirs) {
-    walk(path.join(rootDir, sub));
-  }
-
-  return results;
-}
-
-function maskStringsPreserveLength(line: string): string {
-  return line
-    .replace(/"(?:\\.|[^"\\])*"/g, (m) => " ".repeat(m.length))
-    .replace(/'(?:\\.|[^'\\])*'/g, (m) => " ".repeat(m.length))
-    .replace(/`(?:\\.|[^`\\])*`/g, (m) => " ".repeat(m.length));
-}
-
-function isAllowedDirectiveComment(lang: SupportedLanguage, lineIdx: number, trimmedComment: string): boolean {
-  if (lineIdx === 0 && trimmedComment.startsWith("#!")) {
-    return true;
-  }
-  if (lang === "go" && (trimmedComment.startsWith("//go:build") || trimmedComment.startsWith("// +build"))) {
-    return true;
-  }
-  return false;
+export function collectPolyglotSourceFiles(rootDir: string, subDirs?: readonly string[]): string[] {
+  const roots = subDirs ? subDirs.map(directory => path.join(rootDir, directory)) : [rootDir];
+  return [...new Set(roots.flatMap(collectProjectFiles))].filter(file => isSourceFile(file) && !isTestFile(path.basename(file)));
 }
 
 export function lintNonTsSourceText(
@@ -150,185 +81,40 @@ export function lintNonTsSourceText(
   boundaries: Record<string, BoundaryRule> = {}
 ): PolyglotViolation[] {
   const violations: PolyglotViolation[] = [];
-  const lines = sourceText.split(/\r?\n/);
-
-  if (lang === "php") {
-    const hasStrictTypes = /declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;/.test(sourceText);
-    if (!hasStrictTypes) {
-      violations.push({
-        file: relativePath,
-        line: 1,
-        language: "php",
-        ruleId: "DUNE_PHP_STRICT_TYPES_REQUIRED",
-        message: "PHP files in Dune codebase must declare 'declare(strict_types=1);' at the top."
-      });
-    }
+  const tokenized = tokenizeNonTypeScript(sourceText, lang);
+  const rawLines = sourceText.split(/\r?\n/);
+  const add = (ruleId: PolyglotViolation["ruleId"], line: number, message: string): void => {
+    violations.push({ file: relativePath, line, language: lang, ruleId, message });
+  };
+  if (lang === "php" && !/declare\s*\(\s*strict_types\s*=\s*1\s*\)\s*;/.test(tokenized.code)) {
+    add("DUNE_PHP_STRICT_TYPES_REQUIRED", 1, "PHP requires declare(strict_types=1).");
   }
-
-  let inMultiLineComment = false;
-
-  lines.forEach((rawLine, idx) => {
-    const lineNum = idx + 1;
-    const trimmed = rawLine.trim();
-
-    if (inMultiLineComment) {
-      if (trimmed.includes("*/")) {
-        inMultiLineComment = false;
-      }
-      return;
-    }
-
-    const codeOnly = maskStringsPreserveLength(rawLine);
-
-    if ((lang === "go" || lang === "php") && codeOnly.includes("/*")) {
-      const commentStart = rawLine.slice(codeOnly.indexOf("/*"));
-      const isSuppression = /(@phpstan-ignore|@psalm-suppress|nolint)/.test(commentStart);
-      violations.push({
-        file: relativePath,
-        line: lineNum,
-        language: lang,
-        ruleId: isSuppression ? "DUNE_NO_LINTER_SUPPRESSION" : "DUNE_NO_COMMENTS",
-        message: isSuppression
-          ? `Linter suppression directive is prohibited in ${lang.toUpperCase()} codebase.`
-          : `Comments are strictly prohibited in Dune ${lang.toUpperCase()} codebase.`
-      });
-      if (!codeOnly.includes("*/")) {
-        inMultiLineComment = true;
-      }
-    }
-
-    if (lang === "python" && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
-      violations.push({
-        file: relativePath,
-        line: lineNum,
-        language: "python",
-        ruleId: "DUNE_NO_COMMENTS",
-        message: "Docstring/multi-line comments are prohibited in Dune Python codebase. Use expressive type annotations."
-      });
-    }
-
-    if ((lang === "python" || lang === "php") && codeOnly.includes("#")) {
-      const hashIdx = codeOnly.indexOf("#");
-      const isPhpAttribute = lang === "php" && rawLine.slice(hashIdx).startsWith("#[");
-      if (!isPhpAttribute) {
-        const commentPart = rawLine.slice(hashIdx).trim();
-        if (!isAllowedDirectiveComment(lang, idx, commentPart)) {
-          const isSuppression = /(type:\s*ignore|noqa|pylint:\s*disable|@phpstan-ignore)/.test(
-            commentPart
-          );
-          violations.push({
-            file: relativePath,
-            line: lineNum,
-            language: lang,
-            ruleId: isSuppression ? "DUNE_NO_LINTER_SUPPRESSION" : "DUNE_NO_COMMENTS",
-            message: isSuppression
-              ? `Suppression comment ('${commentPart}') is forbidden.`
-              : `Comments ('#') are strictly prohibited in Dune ${lang.toUpperCase()} codebase.`
-          });
-        }
-      }
-    }
-
-    if ((lang === "go" || lang === "php") && codeOnly.includes("//")) {
-      const slashIdx = codeOnly.indexOf("//");
-      const commentPart = rawLine.slice(slashIdx).trim();
-      if (!isAllowedDirectiveComment(lang, idx, commentPart)) {
-        const isSuppression = /(nolint|@phpstan-ignore|@psalm-suppress)/.test(commentPart);
-        violations.push({
-          file: relativePath,
-          line: lineNum,
-          language: lang,
-          ruleId: isSuppression ? "DUNE_NO_LINTER_SUPPRESSION" : "DUNE_NO_COMMENTS",
-          message: isSuppression
-            ? `Suppression comment ('${commentPart}') is forbidden.`
-            : `Comments ('//') are strictly prohibited in Dune ${lang.toUpperCase()} codebase.`
-        });
-      }
-    }
-
-    if (lang === "python") {
-      if (/\bAny\b/.test(codeOnly)) {
-        violations.push({
-          file: relativePath,
-          line: lineNum,
-          language: "python",
-          ruleId: "DUNE_NO_EXPLICIT_ANY",
-          message: "Usage of 'Any' in Python breaks Level 1 Contract guarantees. Use typing.NewType or frozen dataclasses."
-        });
-      }
-      if (/\bprint\s*\(/.test(codeOnly)) {
-        violations.push({
-          file: relativePath,
-          line: lineNum,
-          language: "python",
-          ruleId: "DUNE_NO_CONSOLE_IN_DOMAIN",
-          message: "Direct 'print()' output is forbidden in Python domain code. Return Result values."
-        });
-      }
-    }
-
-    if (lang === "go") {
-      if (/\binterface\s*\{\s*\}|(?:[)\]]|\b\w+)\s+any\b|\]any\b/.test(codeOnly)) {
-        violations.push({
-          file: relativePath,
-          line: lineNum,
-          language: "go",
-          ruleId: "DUNE_NO_EXPLICIT_ANY",
-          message: "Usage of 'interface{}' or 'any' in Go breaks Level 1 Contract guarantees. Use distinct types or generics."
-        });
-      }
-      if (/\bfmt\.Print(ln|f)?\s*\(/.test(codeOnly)) {
-        violations.push({
-          file: relativePath,
-          line: lineNum,
-          language: "go",
-          ruleId: "DUNE_NO_CONSOLE_IN_DOMAIN",
-          message: "Direct 'fmt.Print*' output is forbidden in Go domain code. Return explicit (T, error)."
-        });
-      }
-    }
-
-    if (lang === "php") {
-      if (/:\s*mixed\b|\bmixed\s+\$/.test(codeOnly)) {
-        violations.push({
-          file: relativePath,
-          line: lineNum,
-          language: "php",
-          ruleId: "DUNE_NO_EXPLICIT_ANY",
-          message: "Usage of 'mixed' type in PHP breaks Level 1 Contract guarantees. Use strict readonly Value Objects."
-        });
-      }
-      if (/\b(var_dump|print_r|dd|dump)\s*\(|\becho\s+/.test(codeOnly)) {
-        violations.push({
-          file: relativePath,
-          line: lineNum,
-          language: "php",
-          ruleId: "DUNE_NO_CONSOLE_IN_DOMAIN",
-          message: "Direct debug/output ('var_dump', 'dd', 'print_r', 'echo') is forbidden in PHP domain code."
-        });
-      }
-    }
-
-    const importedSpecs = extractImportsFromLine(rawLine, lang);
-    for (const spec of importedSpecs) {
-      for (const boundary of Object.values(boundaries)) {
-        if (relativePath.startsWith(boundary.pathPrefix)) {
-          for (const forbidden of boundary.forbiddenImports) {
-            if (spec === forbidden || spec.includes(forbidden)) {
-              violations.push({
-                file: relativePath,
-                line: lineNum,
-                language: lang,
-                ruleId: "DUNE_BOUNDARY_VIOLATION",
-                message: `Boundary lock violated: '${relativePath}' cannot import '${spec}' (matches forbidden '${forbidden}').`
-              });
-            }
+  for (const range of tokenized.comments) {
+    const text = sourceText.slice(range.start, range.end);
+    const suppression = /type:\s*ignore|noqa|pylint:\s*disable|nolint|@phpstan-ignore|@psalm-suppress/.test(text);
+    add(suppression ? "DUNE_NO_LINTER_SUPPRESSION" : "DUNE_NO_COMMENTS", sourceText.slice(0, range.start).split("\n").length,
+      suppression ? "Linter suppression is prohibited." : "Use expressive names instead of source comments.");
+  }
+  let inGoImports = false;
+  tokenized.code.split(/\r?\n/).forEach((code, index) => {
+    if (lang === "go" && /^\s*import\s*\(/.test(code)) inGoImports = true;
+    if (lang === "go" && /^\s*\)/.test(code)) inGoImports = false;
+    const line = index + 1;
+    const weak = lang === "python" ? /\bAny\b/.test(code) : lang === "go" ? /\binterface\s*\{\s*\}|(?:[)\]]|\b\w+)\s+any\b|\]any\b/.test(code) : /:\s*mixed\b|\bmixed\s+\$/.test(code);
+    if (weak) add("DUNE_NO_EXPLICIT_ANY", line, "Weak types break validated domain contracts.");
+    const output = lang === "python" ? /\bprint\s*\(/.test(code) : lang === "go" ? /\bfmt\.Print(?:ln|f)?\s*\(/.test(code) : /\b(?:var_dump|print_r|dd|dump)\s*\(|\becho\s+/.test(code);
+    if (output) add("DUNE_NO_CONSOLE_IN_DOMAIN", line, "Return structured results instead of direct output.");
+    const rawLine = rawLines[index] ?? "";
+    if (code.trim().length > 0 || inGoImports) {
+      for (const imported of extractImportsFromLine(rawLine, lang)) {
+        for (const boundary of Object.values(boundaries)) {
+          if (relativePath.startsWith(boundary.pathPrefix) && boundary.forbiddenImports.some(forbidden => imported === forbidden || imported.includes(forbidden))) {
+            add("DUNE_BOUNDARY_VIOLATION", line, "Import crosses a forbidden architectural boundary.");
           }
         }
       }
     }
   });
-
   return violations;
 }
 
@@ -345,7 +131,7 @@ export function extractImportsFromLine(
     const importMatch = /^import\s+([a-zA-Z0-9_.]+)/.exec(trimmed);
     if (importMatch?.[1]) specs.push(importMatch[1]);
   } else if (lang === "go") {
-    const goMatch = /"([^"]+)"/.exec(trimmed);
+    const goMatch = /["`]([^"`]+)["`]/.exec(trimmed);
     if (
       goMatch?.[1] &&
       (trimmed.startsWith("import ") || (!trimmed.includes("=") && !trimmed.includes("(")))
@@ -364,181 +150,25 @@ export function extractImportsFromLine(
   return specs;
 }
 
-export function scanNonTsSlop(
-  sourceText: string,
-  relativePath: string,
-  lang: Exclude<SupportedLanguage, "typescript">
-): PolyglotSlopFinding[] {
+export function scanNonTsSlop(sourceText: string, relativePath: string, lang: Exclude<SupportedLanguage, "typescript">): PolyglotSlopFinding[] {
   const findings: PolyglotSlopFinding[] = [];
-  const lines = sourceText.split(/\r?\n/);
-
-  lines.forEach((rawLine, idx) => {
-    const lineNum = idx + 1;
-    const trimmed = rawLine.trim();
-    const nextTrimmed = lines[idx + 1]?.trim() ?? "";
-
-    if (lang === "python") {
-      if (/^except(\s+[^:]+)?:\s*pass\b/.test(trimmed) || (/^except(\s+[^:]+)?:$/.test(trimmed) && nextTrimmed === "pass")) {
-        findings.push({
-          file: relativePath,
-          line: lineNum,
-          language: "python",
-          kind: "EMPTY_CATCH_BLOCK",
-          description: "Swallowing exceptions via 'except: pass' is AI slop. Return an explicit Err Result."
-        });
-      }
-      if (/\b(breakpoint|pdb\.set_trace)\s*\(/.test(trimmed)) {
-        findings.push({
-          file: relativePath,
-          line: lineNum,
-          language: "python",
-          kind: "DEBUG_LEFTOVER",
-          description: "Leftover Python debugger statement ('breakpoint()' or 'pdb.set_trace()') detected."
-        });
-      }
+  const code = tokenizeNonTypeScript(sourceText, lang).code;
+  const patterns: readonly { readonly kind: PolyglotSlopFinding["kind"]; readonly pattern: RegExp }[] = lang === "python"
+    ? [{ kind: "EMPTY_CATCH_BLOCK", pattern: /\bexcept(?:\s+[^:\n]+)?:\s*pass\b/g }, { kind: "DEBUG_LEFTOVER", pattern: /\b(?:breakpoint|pdb\.set_trace)\s*\(/g }]
+    : lang === "go"
+      ? [{ kind: "SWALLOWED_ERROR_RESULT", pattern: /(?:^|\n)\s*_\s*=\s*err\b|,\s*_\s*:?=\s*[a-zA-Z0-9_.]+\(/g }]
+      : [{ kind: "EMPTY_CATCH_BLOCK", pattern: /\bcatch\s*\([^)]+\)\s*\{\s*\}/g }, { kind: "DEBUG_LEFTOVER", pattern: /\bxdebug_break\s*\(/g }];
+  for (const rule of patterns) {
+    for (const match of code.matchAll(rule.pattern)) {
+      findings.push({ file: relativePath, line: code.slice(0, match.index).split("\n").length, language: lang, kind: rule.kind, description: "Handle errors explicitly and remove debugger calls." });
     }
-
-    if (lang === "go") {
-      if (/^\s*_\s*=\s*err\b/.test(rawLine) || /,\s*_\s*:?=\s*[a-zA-Z0-9_.]+\(/.test(rawLine)) {
-        findings.push({
-          file: relativePath,
-          line: lineNum,
-          language: "go",
-          kind: "SWALLOWED_ERROR_RESULT",
-          description: "Blank-identifier error suppression ('_ = err') is prohibited in Go domain logic."
-        });
-      }
-    }
-
-    if (lang === "php") {
-      if (/catch\s*\([^)]+\)\s*\{\s*\}/.test(trimmed)) {
-        findings.push({
-          file: relativePath,
-          line: lineNum,
-          language: "php",
-          kind: "EMPTY_CATCH_BLOCK",
-          description: "Empty 'catch (...) {}' block swallows exceptions in PHP."
-        });
-      }
-      if (/\bxdebug_break\s*\(/.test(trimmed)) {
-        findings.push({
-          file: relativePath,
-          line: lineNum,
-          language: "php",
-          kind: "DEBUG_LEFTOVER",
-          description: "Leftover 'xdebug_break()' debugger call detected."
-        });
-      }
-    }
-  });
-
+  }
   return findings;
 }
 
-export function stripNonTsComments(
-  sourceText: string,
-  lang: Exclude<SupportedLanguage, "typescript">
-): { readonly cleanedText: string; readonly removedCount: number } {
-  const lines = sourceText.split(/\r?\n/);
-  let removedCount = 0;
-  const outLines: string[] = [];
-  let inBlockComment = false;
-  let inPythonDocstring: '"""' | "'''" | null = null;
-
-  lines.forEach((rawLine, idx) => {
-    const trimmed = rawLine.trim();
-
-    if (inPythonDocstring !== null) {
-      if (trimmed.includes(inPythonDocstring)) {
-        inPythonDocstring = null;
-      }
-      return;
-    }
-
-    if (inBlockComment) {
-      const closeIdx = rawLine.indexOf("*/");
-      if (closeIdx !== -1) {
-        inBlockComment = false;
-        const after = rawLine.slice(closeIdx + 2).trimEnd();
-        if (after.trim().length > 0) {
-          outLines.push(after);
-        }
-      }
-      return;
-    }
-
-    if (lang === "python" && (trimmed.startsWith('"""') || trimmed.startsWith("'''"))) {
-      const quote: '"""' | "'''" = trimmed.startsWith('"""') ? '"""' : "'''";
-      removedCount++;
-      if (!trimmed.slice(3).includes(quote)) {
-        inPythonDocstring = quote;
-      }
-      return;
-    }
-
-    let workingLine = rawLine;
-    let codeOnly = maskStringsPreserveLength(workingLine);
-
-    if ((lang === "go" || lang === "php") && codeOnly.includes("/*")) {
-      const openIdx = codeOnly.indexOf("/*");
-      const closeIdx = codeOnly.indexOf("*/", openIdx + 2);
-      removedCount++;
-      if (closeIdx !== -1) {
-        const before = workingLine.slice(0, openIdx);
-        const after = workingLine.slice(closeIdx + 2);
-        workingLine = (before + after).trimEnd();
-        if (workingLine.trim().length === 0) {
-          return;
-        }
-        codeOnly = maskStringsPreserveLength(workingLine);
-      } else {
-        inBlockComment = true;
-        const before = workingLine.slice(0, openIdx).trimEnd();
-        if (before.trim().length > 0) {
-          outLines.push(before);
-        }
-        return;
-      }
-    }
-
-    if (lang === "python" || lang === "php") {
-      const hashIdx = codeOnly.indexOf("#");
-      const isPhpAttr = lang === "php" && hashIdx !== -1 && workingLine.slice(hashIdx).startsWith("#[");
-      if (hashIdx !== -1 && !isPhpAttr) {
-        const commentPart = workingLine.slice(hashIdx).trim();
-        if (!isAllowedDirectiveComment(lang, idx, commentPart)) {
-          removedCount++;
-          const before = workingLine.slice(0, hashIdx).trimEnd();
-          if (before.length > 0) {
-            outLines.push(before);
-          }
-          return;
-        }
-      }
-    }
-
-    if (lang === "go" || lang === "php") {
-      const slashIdx = codeOnly.indexOf("//");
-      if (slashIdx !== -1) {
-        const commentPart = workingLine.slice(slashIdx).trim();
-        if (!isAllowedDirectiveComment(lang, idx, commentPart)) {
-          removedCount++;
-          const before = workingLine.slice(0, slashIdx).trimEnd();
-          if (before.length > 0) {
-            outLines.push(before);
-          }
-          return;
-        }
-      }
-    }
-
-    outLines.push(workingLine);
-  });
-
-  return {
-    cleanedText: outLines.join("\n"),
-    removedCount
-  };
+export function stripNonTsComments(sourceText: string, lang: Exclude<SupportedLanguage, "typescript">): { readonly cleanedText: string; readonly removedCount: number } {
+  const ranges = tokenizeNonTypeScript(sourceText, lang).comments;
+  return { cleanedText: replaceSourceRanges(sourceText, ranges), removedCount: ranges.length };
 }
 
 export const POLYGLOT_CONTRACT_TEMPLATES: Record<Exclude<SupportedLanguage, "typescript">, {
