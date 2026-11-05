@@ -60,6 +60,7 @@
       ],
       "tests": [
         "tests/harness-guardrails.spec.ts",
+        "tests/diff-paths.spec.ts",
         "tests/analysis-regressions.spec.ts",
         "tests/control-regressions.spec.ts",
         "tests/review-fixtures.contract.ts"

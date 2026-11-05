@@ -1,3 +1,4 @@
+import path from "node:path";
 import { loadFeatureMap } from "./project-config.js";
 import { readGit, isDirectExecution } from "./runtime.js";
 
@@ -44,7 +45,7 @@ function readWorkingFiles(rootDir: string): { files: string[]; errors: string[] 
 }
 
 function readChangedFiles(rootDir: string, options: DiffOptions): { files: string[]; errors: string[] } {
-  const useEnvironment = rootDir === process.cwd();
+  const useEnvironment = path.resolve(rootDir) === process.cwd();
   const baseRef = options.baseRef ?? (useEnvironment ? process.env["CONTROL_GLASS_BASE_REF"] : undefined);
   const headRef = options.headRef ?? (useEnvironment ? process.env["CONTROL_GLASS_HEAD_REF"] : undefined) ?? "HEAD";
   if (baseRef !== undefined) {

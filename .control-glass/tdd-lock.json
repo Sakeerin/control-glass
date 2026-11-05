@@ -1,12 +1,13 @@
 {
-  "updatedAt": "2026-11-05T04:14:57.170Z",
+  "updatedAt": "2026-11-05T07:36:34.163Z",
   "files": {
+    "src/core/contracts.ts": "b4a7079cd58b8ac815dce0dd338ce02d8d48e2b7407e541bbfe602a57d91aef5",
     "tests/analysis-regressions.spec.ts": "978f769728d1e03e0247c6dd36869711e39b3200b8ae99db39b10272a84ec9ca",
     "tests/control-regressions.spec.ts": "fd0e39376052a000343388ef0c015f4595657168825b16e313c0d6119234e338",
+    "tests/diff-paths.spec.ts": "7b240645cc12b32ced2a5b3c9d11af3ea6b430355515f79317d4d78309103088",
     "tests/harness-guardrails.spec.ts": "4a94f32b86cec12001089dc857bfd065ca71b320a8e10e61f7c626993aa15737",
     "tests/multi-vendor.spec.ts": "045563ba9ae075f5bc522426607fa1a2195399558a7b8210fd3ea0d7e7644fe7",
     "tests/polyglot-engine.spec.ts": "b159c59f102d00ddfc184a945d0fae4c43b989712f3dabc9f8d5d963bfa9fda9",
-    "tests/review-fixtures.contract.ts": "c8a024ac26fdd9bedf2bd9dfbf2aee8e58bf28e490bd782463f924cdc19ef4a4",
-    "src/core/contracts.ts": "b4a7079cd58b8ac815dce0dd338ce02d8d48e2b7407e541bbfe602a57d91aef5"
+    "tests/review-fixtures.contract.ts": "c8a024ac26fdd9bedf2bd9dfbf2aee8e58bf28e490bd782463f924cdc19ef4a4"
   }
 }
