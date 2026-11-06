@@ -114,7 +114,7 @@ export function runControlGlass(rootDir: string = process.cwd(), options: Contro
   const typecheck = safety.passed ? runCommands(rootDir, commands.staticCheckCommands, config.timeoutMs) : blockedCommands;
   const dune = attempt(() => runDuneLinter(rootDir), { passed: false, checkedFiles: 0, violations: [] }, errors, "Dune");
   const deslop = attempt(() => runDeslopEngine(rootDir), { passed: false, scannedFiles: 0, cleanedCommentCount: 0, issues: [] }, errors, "Deslop");
-  const tdd = attempt(() => verifyTddLock(rootDir), { passed: false, violations: ["TDD gate failed unexpectedly."] }, errors, "TDD");
+  const tdd = attempt(() => verifyTddLock(rootDir, options), { passed: false, violations: ["TDD gate failed unexpectedly."] }, errors, "TDD");
   const tests = safety.passed ? runCommands(rootDir, commands.testCommands, config.timeoutMs) : blockedCommands;
   const graph = attempt(() => buildDependencyGraph(rootDir), { totalFiles: 0, generatedAt: new Date().toISOString(), nodes: {} }, errors, "Dependency mapping");
   const sourceTreeHash = attempt(() => hashProjectSource(rootDir), "unavailable", errors, "Source provenance");

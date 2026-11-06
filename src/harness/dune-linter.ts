@@ -207,7 +207,7 @@ function checkAstRules(
       const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
       const isRequireCall =
         ts.isIdentifier(node.expression) && node.expression.text === "require";
-      if ((isDynamicImport || isRequireCall) && firstArg && ts.isStringLiteral(firstArg)) {
+      if ((isDynamicImport || isRequireCall) && firstArg && ts.isStringLiteralLike(firstArg)) {
         checkModuleSpecifierAgainstBoundaries(
           sourceFile,
           node.getStart(sourceFile),

@@ -82,7 +82,6 @@ export function lintNonTsSourceText(
 ): PolyglotViolation[] {
   const violations: PolyglotViolation[] = [];
   const tokenized = tokenizeNonTypeScript(sourceText, lang);
-  const rawLines = sourceText.split(/\r?\n/);
   const add = (ruleId: PolyglotViolation["ruleId"], line: number, message: string): void => {
     violations.push({ file: relativePath, line, language: lang, ruleId, message });
   };
@@ -95,26 +94,20 @@ export function lintNonTsSourceText(
     add(suppression ? "DUNE_NO_LINTER_SUPPRESSION" : "DUNE_NO_COMMENTS", sourceText.slice(0, range.start).split("\n").length,
       suppression ? "Linter suppression is prohibited." : "Use expressive names instead of source comments.");
   }
-  let inGoImports = false;
   tokenized.code.split(/\r?\n/).forEach((code, index) => {
-    if (lang === "go" && /^\s*import\s*\(/.test(code)) inGoImports = true;
-    if (lang === "go" && /^\s*\)/.test(code)) inGoImports = false;
     const line = index + 1;
     const weak = lang === "python" ? /\bAny\b/.test(code) : lang === "go" ? /\binterface\s*\{\s*\}|(?:[)\]]|\b\w+)\s+any\b|\]any\b/.test(code) : /:\s*mixed\b|\bmixed\s+\$/.test(code);
     if (weak) add("DUNE_NO_EXPLICIT_ANY", line, "Weak types break validated domain contracts.");
     const output = lang === "python" ? /\bprint\s*\(/.test(code) : lang === "go" ? /\bfmt\.Print(?:ln|f)?\s*\(/.test(code) : /\b(?:var_dump|print_r|dd|dump)\s*\(|\becho\s+/.test(code);
     if (output) add("DUNE_NO_CONSOLE_IN_DOMAIN", line, "Return structured results instead of direct output.");
-    const rawLine = rawLines[index] ?? "";
-    if (code.trim().length > 0 || inGoImports) {
-      for (const imported of extractImportsFromLine(rawLine, lang)) {
-        for (const boundary of Object.values(boundaries)) {
-          if (relativePath.startsWith(boundary.pathPrefix) && boundary.forbiddenImports.some(forbidden => imported === forbidden || imported.includes(forbidden))) {
-            add("DUNE_BOUNDARY_VIOLATION", line, "Import crosses a forbidden architectural boundary.");
-          }
-        }
+  });
+  for (const imported of extractNonTsImports(sourceText, lang)) {
+    for (const boundary of Object.values(boundaries)) {
+      if (relativePath.startsWith(boundary.pathPrefix) && boundary.forbiddenImports.some(forbidden => imported.specifier === forbidden || imported.specifier.includes(forbidden))) {
+        add("DUNE_BOUNDARY_VIOLATION", imported.line, "Import crosses a forbidden architectural boundary.");
       }
     }
-  });
+  }
   return violations;
 }
 
@@ -128,19 +121,28 @@ export function extractImportsFromLine(
   if (lang === "python") {
     const fromMatch = /^from\s+([a-zA-Z0-9_.]+)\s+import\b/.exec(trimmed);
     if (fromMatch?.[1]) specs.push(fromMatch[1]);
-    const importMatch = /^import\s+([a-zA-Z0-9_.]+)/.exec(trimmed);
-    if (importMatch?.[1]) specs.push(importMatch[1]);
+    const importMatch = /^import\s+(.+)/.exec(trimmed);
+    for (const item of importMatch?.[1]?.split(",") ?? []) {
+      const imported = /^\s*([a-zA-Z0-9_.]+)/.exec(item);
+      if (imported?.[1]) specs.push(imported[1]);
+    }
   } else if (lang === "go") {
-    const goMatch = /["`]([^"`]+)["`]/.exec(trimmed);
-    if (
-      goMatch?.[1] &&
-      (trimmed.startsWith("import ") || (!trimmed.includes("=") && !trimmed.includes("(")))
-    ) {
-      specs.push(goMatch[1]);
+    if (trimmed.startsWith("import ") || (!trimmed.includes("=") && !trimmed.includes("("))) {
+      for (const imported of trimmed.matchAll(/["`]([^"`]+)["`]/g)) {
+        if (imported[1]) specs.push(imported[1]);
+      }
     }
   } else if (lang === "php") {
-    const useMatch = /^use\s+([a-zA-Z0-9_\\]+)\s*;/.exec(trimmed);
-    if (useMatch?.[1]) specs.push(useMatch[1]);
+    const useMatch = /^use\s+(?:(?:function|const)\s+)?([^;]+);/.exec(trimmed);
+    if (useMatch?.[1]) {
+      const clause = useMatch[1];
+      const group = /^([a-zA-Z0-9_\\]+)\{([^}]+)\}$/.exec(clause.trim());
+      const prefix = group?.[1] ?? "";
+      for (const item of (group?.[2] ?? clause).split(",")) {
+        const imported = /^\s*(?:(?:function|const)\s+)?([a-zA-Z0-9_\\]+)/.exec(item);
+        if (imported?.[1]) specs.push(prefix + imported[1]);
+      }
+    }
     const reqMatch = /\b(?:require|require_once|include|include_once)\s*\(?\s*['"]([^'"]+)['"]/.exec(
       trimmed
     );
@@ -148,6 +150,37 @@ export function extractImportsFromLine(
   }
 
   return specs;
+}
+
+export function extractNonTsImports(sourceText: string, lang: Exclude<SupportedLanguage, "typescript">): { readonly specifier: string; readonly line: number }[] {
+  const tokenized = tokenizeNonTypeScript(sourceText, lang);
+  const code = tokenized.code;
+  const imports: { specifier: string; line: number }[] = [];
+  if (lang === "php") {
+    for (const match of code.matchAll(/\buse\s+[a-zA-Z_\\][^;]+;/g)) {
+      const statement = match[0].replace(/\s+/g, " ");
+      const line = sourceText.slice(0, match.index).split("\n").length;
+      for (const specifier of extractImportsFromLine(statement, lang)) imports.push({ specifier, line });
+    }
+    for (const match of code.matchAll(/\b(?:require|require_once|include|include_once)\b/g)) {
+      const statement = sourceText.slice(match.index).split(/\r?\n/)[0] ?? "";
+      const line = sourceText.slice(0, match.index).split("\n").length;
+      for (const specifier of extractImportsFromLine(statement, lang)) imports.push({ specifier, line });
+    }
+  } else {
+    const rawLines = replaceSourceRanges(sourceText, tokenized.comments).split(/\r?\n/);
+    let inGoImports = false;
+    code.split(/\r?\n/).forEach((codeLine, index) => {
+      if (lang === "go" && /^\s*import\s*\(/.test(codeLine)) inGoImports = true;
+      const importLine = lang === "python" ? /^\s*(?:import|from)\b/.test(codeLine) : inGoImports || /^\s*import\b/.test(codeLine);
+      if (importLine) {
+        const statement = lang === "python" ? codeLine : rawLines[index] ?? "";
+        for (const specifier of extractImportsFromLine(statement, lang)) imports.push({ specifier, line: index + 1 });
+      }
+      if (lang === "go" && /\)/.test(codeLine)) inGoImports = false;
+    });
+  }
+  return imports;
 }
 
 export function scanNonTsSlop(sourceText: string, relativePath: string, lang: Exclude<SupportedLanguage, "typescript">): PolyglotSlopFinding[] {

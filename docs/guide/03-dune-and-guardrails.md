@@ -43,6 +43,6 @@ To eliminate the 400% Code Review bottleneck, `diff-reviewer.ts` compares `git s
 
 | Tier | Criteria | Action |
 | :--- | :--- | :--- |
-| **Tier 0** | Changes isolated to `Tier 0` features (e.g. `src/ui/`) with 100% gate pass | **Auto-Merge Eligible** (Zero human bottleneck) |
+| **Tier 0** | Proven formatting-only changes to existing TypeScript/TSX UI files with 100% gate pass | **Auto-Merge Eligible**; filename-only classification cannot approve a merge |
 | **Tier 1** | Standard feature changes in `src/features/` | **Task Owner Review** with Diff Consequence summary |
 | **Tier 2** | Touches `src/core/contracts.ts`, `src/harness/`, or `Tier 2` critical features | **Senior / Domain Expert Review** + Canary Rollout (`1% -> 10% -> 100%`) |

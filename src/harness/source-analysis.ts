@@ -1,4 +1,12 @@
-import ts from "typescript";
+import type ts from "typescript";
+import { createRequire } from "node:module";
+
+const requireCompiler = createRequire(import.meta.url);
+
+export function loadTypeScript(): typeof import("typescript") {
+  const compiler: typeof import("typescript") = requireCompiler("typescript");
+  return compiler;
+}
 
 export interface SourceRange {
   readonly start: number;
@@ -7,6 +15,7 @@ export interface SourceRange {
 }
 
 export function typeScriptComments(sourceFile: ts.SourceFile): readonly SourceRange[] {
+  const ts = loadTypeScript();
   const ranges = new Map<number, SourceRange>();
   function visit(node: ts.Node): void {
     const start = node.getStart(sourceFile, false);
@@ -89,7 +98,7 @@ export function tokenizeNonTypeScript(text: string, language: "python" | "go" | 
       }
       const comment = text.slice(index, end).trim();
       const directive = (index === 0 && comment.startsWith("#!")) ||
-        (language === "go" && /^\/\/(?:go:build| \+build)\b/.test(comment));
+        (language === "go" && /^\/\/(?:go:[a-z][a-z0-9]*(?:\s|$)|line\s| \+build\b)/.test(comment));
       if (!directive) comments.push({ start: index, end });
       index = end;
       continue;

@@ -23,6 +23,7 @@ export {
   verifyTddLock,
   writeTddLockManifest,
   type SpecFreezeOptions,
+  type TddLockOptions,
   type TddLockManifest
 } from "./harness/tdd-guard.js";
 export {

@@ -1,6 +1,7 @@
 import path from "node:path";
 import { loadFeatureMap } from "./project-config.js";
 import { readGit, isDirectExecution } from "./runtime.js";
+import { assessUiChange, type UiDiffContext } from "./ui-change-review.js";
 
 export type ReviewTier = "Tier 0" | "Tier 1" | "Tier 2";
 export interface FeatureEntry {
@@ -27,6 +28,10 @@ export interface DiffReviewReport {
 }
 const TIER_WEIGHT: Record<ReviewTier, number> = { "Tier 0": 0, "Tier 1": 1, "Tier 2": 2 };
 
+function isCriticalPath(file: string): boolean {
+  return /^src\/(?:core|Core|harness)\//.test(file) || /(?:^|\/)contracts\.(?:ts|py|go)$/i.test(file) || file.endsWith("/Contracts.php") || file === ".control-glass/tdd-lock.json" || ["feature-map.json", "control-glass.config.json", "AGENTS.md", "package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"].includes(file) || file.startsWith(".github/workflows/");
+}
+
 function readWorkingFiles(rootDir: string): { files: string[]; errors: string[] } {
   const status = readGit(rootDir, ["status", "--porcelain=v1", "-z", "--untracked-files=all"]);
   if (!status.ok) return { files: [], errors: ["GIT_STATUS_UNAVAILABLE"] };
@@ -44,16 +49,16 @@ function readWorkingFiles(rootDir: string): { files: string[]; errors: string[] 
   return { files, errors: [] };
 }
 
-function readChangedFiles(rootDir: string, options: DiffOptions): { files: string[]; errors: string[] } {
+function readChangedFiles(rootDir: string, options: DiffOptions): { files: string[]; errors: string[]; uiContext: UiDiffContext | null } {
   const useEnvironment = path.resolve(rootDir) === process.cwd();
   const baseRef = options.baseRef ?? (useEnvironment ? process.env["CONTROL_GLASS_BASE_REF"] : undefined);
   const headRef = options.headRef ?? (useEnvironment ? process.env["CONTROL_GLASS_HEAD_REF"] : undefined) ?? "HEAD";
   if (baseRef !== undefined) {
-    if (baseRef.startsWith("-") || headRef.startsWith("-")) return { files: [], errors: ["INVALID_DIFF_REFERENCE"] };
+    if (baseRef.startsWith("-") || headRef.startsWith("-")) return { files: [], errors: ["INVALID_DIFF_REFERENCE"], uiContext: null };
     const mergeBase = readGit(rootDir, ["merge-base", baseRef, headRef]);
-    if (!mergeBase.ok) return { files: [], errors: ["DIFF_BASE_UNAVAILABLE"] };
+    if (!mergeBase.ok) return { files: [], errors: ["DIFF_BASE_UNAVAILABLE"], uiContext: null };
     const diff = readGit(rootDir, ["diff", "--name-status", "-z", "--find-renames", mergeBase.value.trim(), headRef, "--"]);
-    if (!diff.ok) return { files: [], errors: ["GIT_DIFF_UNAVAILABLE"] };
+    if (!diff.ok) return { files: [], errors: ["GIT_DIFF_UNAVAILABLE"], uiContext: null };
     const fields = diff.value.split("\0");
     const files: string[] = [];
     for (let index = 0; index < fields.length;) {
@@ -67,24 +72,32 @@ function readChangedFiles(rootDir: string, options: DiffOptions): { files: strin
       }
     }
     const working = readWorkingFiles(rootDir);
-    return { files: [...files, ...working.files], errors: working.errors };
+    const changedFiles = [...files, ...working.files];
+    return { files: changedFiles, errors: working.errors, uiContext: { baseRef: mergeBase.value.trim(), headRef, workingFiles: working.files, changedFiles } };
   }
-  if (useEnvironment && process.env["CI"] === "true") return { files: [], errors: ["CI_REQUIRES_EXPLICIT_BASE_REF"] };
-  return readWorkingFiles(rootDir);
+  if (useEnvironment && process.env["CI"] === "true") return { files: [], errors: ["CI_REQUIRES_EXPLICIT_BASE_REF"], uiContext: null };
+  const working = readWorkingFiles(rootDir);
+  return { ...working, uiContext: working.errors.length > 0 ? null : { baseRef: "HEAD", workingFiles: working.files, changedFiles: working.files } };
 }
 
 export function analyzeDiffAndTier(rootDir: string = process.cwd(), explicitChangedFiles?: readonly string[], options: DiffOptions = {}): DiffReviewReport {
-  const changes = explicitChangedFiles === undefined ? readChangedFiles(rootDir, options) : { files: [...explicitChangedFiles], errors: [] };
+  const observed = readChangedFiles(rootDir, options);
+  const changes = explicitChangedFiles === undefined ? observed : { files: [...explicitChangedFiles], errors: [], uiContext: observed.uiContext };
   const changedFiles = [...new Set(changes.files.map(file => file.replace(/\\/g, "/")))];
   let features: readonly FeatureEntry[] = [];
   try { features = loadFeatureMap(rootDir).features; }
   catch { changes.errors.push("INVALID_FEATURE_MAP"); }
-  let highestTier: ReviewTier = changes.errors.length > 0 ? "Tier 2" : "Tier 0";
+  const requiresExpertReview = changes.errors.length > 0 || changedFiles.some(isCriticalPath);
+  let highestTier: ReviewTier = requiresExpertReview ? "Tier 2" : "Tier 0";
   const impacted: DiffReviewReport["impactedFeatures"][number][] = [];
+  let verifiedUiFormatting = changedFiles.length > 0;
   for (const file of changedFiles) {
-    const critical = /^src\/(?:core|Core|harness)\//.test(file) || /(?:^|\/)contracts\.(?:ts|py|go)$/i.test(file) || file.endsWith("/Contracts.php") || file === ".control-glass/tdd-lock.json" || ["feature-map.json", "control-glass.config.json", "AGENTS.md", "package.json", "package-lock.json", "tsconfig.json", "tsconfig.build.json"].includes(file) || file.startsWith(".github/workflows/");
+    const critical = isCriticalPath(file);
     const ui = /^(?:src\/ui|src\/components|components)\//.test(file);
-    let fileTier: ReviewTier = critical ? "Tier 2" : ui ? "Tier 0" : "Tier 1";
+    const uiChange: ReturnType<typeof assessUiChange> = ui && !requiresExpertReview ? assessUiChange(rootDir, file, changes.uiContext) : "unavailable";
+    const advisoryUi = explicitChangedFiles !== undefined && uiChange === "unavailable";
+    if (!ui || uiChange !== "formatting") verifiedUiFormatting = false;
+    let fileTier: ReviewTier = critical ? "Tier 2" : ui && (uiChange === "formatting" || advisoryUi) ? "Tier 0" : "Tier 1";
     for (const feature of features) {
       if (![...feature.entrypoints, ...feature.contracts, ...feature.tests].includes(file)) continue;
       if (!impacted.some(item => item.id === feature.id)) impacted.push({ id: feature.id, name: feature.name, tier: feature.tier, riskReason: feature.riskReason });
@@ -97,6 +110,7 @@ export function analyzeDiffAndTier(rootDir: string = process.cwd(), explicitChan
     : changedFiles.length === 0 ? "NO CHANGES: No merge approval was issued."
     : highestTier === "Tier 2" ? "SENIOR / DOMAIN EXPERT REVIEW REQUIRED."
     : highestTier === "Tier 1" ? "TASK OWNER REVIEW REQUIRED."
+    : !verifiedUiFormatting ? "REVIEW REQUIRED: UI formatting could not be verified from diff content."
     : options.gatesPassed === true ? "AUTO-MERGE ELIGIBLE: All required gates passed for this low-risk diff."
     : "LOW-RISK CLASSIFICATION: All verification gates must pass before merge approval.";
   return { changedFiles, impactedFeatures: impacted, recommendedTier: highestTier, routingDecision, status, errors: changes.errors };

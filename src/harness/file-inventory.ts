@@ -20,17 +20,25 @@ export function isSourceFile(name: string): boolean {
   return new Set([".ts", ".tsx", ".py", ".go", ".php"]).has(extension);
 }
 
-export function collectProjectFiles(rootDir: string): string[] {
+function collectFiles(rootDir: string, includeFile: (name: string) => boolean): string[] {
   const files: string[] = [];
   function visit(directory: string): void {
     for (const entry of fs.readdirSync(directory, { withFileTypes: true })) {
       const full = path.join(directory, entry.name);
       if (entry.isDirectory() && !IGNORED_DIRECTORIES.has(entry.name)) visit(full);
-      else if (entry.isFile() && (isSourceFile(entry.name) || entry.name.endsWith(".json") || /^\.env(?:\.|$)/.test(entry.name))) files.push(full);
+      else if (entry.isFile() && includeFile(entry.name)) files.push(full);
     }
   }
   if (fs.existsSync(rootDir)) visit(rootDir);
   return files.sort();
+}
+
+export function collectProjectFiles(rootDir: string): string[] {
+  return collectFiles(rootDir, name => isSourceFile(name) || name.endsWith(".json") || /^\.env(?:\.|$)/.test(name));
+}
+
+export function collectSafetyFiles(rootDir: string): string[] {
+  return collectFiles(rootDir, () => true);
 }
 
 export function collectProvenanceFiles(rootDir: string): string[] {

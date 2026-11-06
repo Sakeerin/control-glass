@@ -1,8 +1,9 @@
 {
-  "updatedAt": "2026-11-05T09:05:14.975Z",
+  "updatedAt": "2026-11-06T03:31:22.317Z",
   "files": {
     "src/core/contracts.ts": "b4a7079cd58b8ac815dce0dd338ce02d8d48e2b7407e541bbfe602a57d91aef5",
     "tests/analysis-regressions.spec.ts": "978f769728d1e03e0247c6dd36869711e39b3200b8ae99db39b10272a84ec9ca",
+    "tests/audit-hardening.spec.ts": "d6710504c6c5c032427af902ad1a6adacdb2d2c5c2bbd84cc10567dead32e45a",
     "tests/control-regressions.spec.ts": "fd0e39376052a000343388ef0c015f4595657168825b16e313c0d6119234e338",
     "tests/diff-paths.spec.ts": "7b240645cc12b32ced2a5b3c9d11af3ea6b430355515f79317d4d78309103088",
     "tests/harness-guardrails.spec.ts": "4a94f32b86cec12001089dc857bfd065ca71b320a8e10e61f7c626993aa15737",

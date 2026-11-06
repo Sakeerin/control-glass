@@ -45,6 +45,7 @@
         "src/harness/tdd-guard.ts",
         "src/harness/safety-gate.ts",
         "src/harness/diff-reviewer.ts",
+        "src/harness/ui-change-review.ts",
         "src/harness/auto-mapper.ts",
         "src/harness/bench.ts",
         "src/harness/cli.ts",
@@ -60,6 +61,7 @@
       ],
       "tests": [
         "tests/harness-guardrails.spec.ts",
+        "tests/audit-hardening.spec.ts",
         "tests/provenance-coverage.spec.ts",
         "tests/diff-paths.spec.ts",
         "tests/analysis-regressions.spec.ts",
@@ -104,6 +106,7 @@
       ],
       "tests": [
         "tests/polyglot-engine.spec.ts",
+        "tests/audit-hardening.spec.ts",
         "tests/polyglot-contracts.spec.ts",
         "tests/analysis-regressions.spec.ts",
         "tests/control-regressions.spec.ts",

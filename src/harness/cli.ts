@@ -11,7 +11,7 @@ import { buildDependencyGraph } from "./auto-mapper.js";
 import { runPerformanceBenchmark } from "./bench.js";
 import { runControlGlass } from "./control-glass.js";
 import { runDeslopEngine } from "./deslop.js";
-import { analyzeDiffAndTier } from "./diff-reviewer.js";
+import { analyzeDiffAndTier, type DiffOptions } from "./diff-reviewer.js";
 import { runDuneLinter } from "./dune-linter.js";
 import { installGitAndCiHooks } from "./hook-installer.js";
 import { startMcpStdioServer } from "./mcp-server.js";
@@ -133,6 +133,20 @@ export function initControlGlassProject(
   return { createdFiles: created, conflicts: vendorReport.conflicts };
 }
 
+function parseDiffArguments(args: readonly string[]): DiffOptions {
+  const options: { baseRef?: string; headRef?: string } = {};
+  for (let index = 0; index < args.length; index++) {
+    const flag = args[index];
+    if (flag !== "--base" && flag !== "--head") throw new Error("UNKNOWN_DIFF_ARGUMENT: " + flag);
+    const key = flag === "--base" ? "baseRef" : "headRef";
+    if (options[key] !== undefined) throw new Error("REPEATED_DIFF_ARGUMENT: " + flag);
+    const value = args[++index];
+    if (value === undefined || value.trim().length === 0 || value.startsWith("-")) throw new Error("MISSING_DIFF_ARGUMENT_VALUE: " + flag);
+    options[key] = value;
+  }
+  return options;
+}
+
 function printHelp(): void {
   console.log(`
 🔬 Control Glass CLI v3.0 — Universal Polyglot & Multi-Vendor Agentic Engineering Harness
@@ -146,7 +160,7 @@ Commands:
   sync-vendors    Generate instruction files & slash commands for Claude, OpenAI, Cursor, Copilot, Windsurf & MCP
   mcp             Start the Control Glass MCP (Model Context Protocol) stdio server for any AI client
   vendors         Inspect supported AI vendor adapters (Anthropic Claude, OpenAI, Gemini, Ollama/OpenRouter)
-  verify          Run full 7-gate polyglot empirical verification pipeline & emit .control-glass/evidence-latest.json
+  verify          Run full verification and emit evidence (--base <ref> --head <ref>)
   lint            Run Polyglot Dune AST Linter (No-Comment, Boundary Lock, No-Any, No-Console, Strict-Types)
   deslop [--fix]  Detect & strip AI slop (comments, empty catch blocks, swallowed errors, leftover debuggers)
   map             Auto-generate Polyglot AST Dependency & Export Graph (.control-glass/dependency-graph.json)
@@ -154,7 +168,7 @@ Commands:
   safety          Run Phase 2 Safety & Secret Gate (API key leak & destructive command blocker)
   tdd-check       Verify Phase 1 TDD & Contract SHA-256 immutability lock
   lock            Update Phase 1 TDD & Contract SHA-256 lock (.control-glass/tdd-lock.json)
-  diff            Run Phase 3 Diff & Consequence Analyzer and calculate Review Tier (Tier 0 / 1 / 2)
+  diff            Analyze changes and calculate Review Tier (--base <ref> --head <ref>)
   install-hooks   Install zero-bypass Git pre-commit hook and GitHub Actions CI workflow
 `);
 }
@@ -212,11 +226,7 @@ if (isDirectExecution(import.meta.url)) {
       break;
     }
     case "verify": {
-      const baseIndex = process.argv.indexOf("--base");
-      const headIndex = process.argv.indexOf("--head");
-      const baseRef = baseIndex >= 0 ? process.argv[baseIndex + 1] : undefined;
-      const headRef = headIndex >= 0 ? process.argv[headIndex + 1] : undefined;
-      const report = runControlGlass(cwd, { ...(baseRef === undefined ? {} : { baseRef }), ...(headRef === undefined ? {} : { headRef }) });
+      const report = runControlGlass(cwd, parseDiffArguments(process.argv.slice(3)));
       if (!report.overallPassed) process.exitCode = 1;
       break;
     }
@@ -291,9 +301,7 @@ if (isDirectExecution(import.meta.url)) {
       break;
     }
     case "diff": {
-      const baseIndex = process.argv.indexOf("--base");
-      const baseRef = baseIndex >= 0 ? process.argv[baseIndex + 1] : undefined;
-      const report = analyzeDiffAndTier(cwd, undefined, baseRef === undefined ? {} : { baseRef });
+      const report = analyzeDiffAndTier(cwd, undefined, parseDiffArguments(process.argv.slice(3)));
       if (report.status !== "known") process.exitCode = 1;
       console.log(`🎯 Recommended Tier: ${report.recommendedTier}`);
       console.log(`🚦 Decision: ${report.routingDecision}`);

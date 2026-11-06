@@ -9,6 +9,7 @@ const ManifestSchema = z.object({ updatedAt: z.string(), files: z.record(z.strin
 const ReceiptSchema = z.object({ manifestHash: z.string(), headCommit: z.string().nullable() });
 export type TddLockManifest = z.infer<typeof ManifestSchema>;
 export interface SpecFreezeOptions { readonly phase: "spec-freeze" | "initialization"; }
+export interface TddLockOptions { readonly baseRef?: string; }
 const LOCK_FILE_REL_PATH = ".control-glass/tdd-lock.json";
 
 function digest(text: string): string {
@@ -25,10 +26,11 @@ function headCommit(rootDir: string): string | null {
   const head = readGit(rootDir, ["rev-parse", "--verify", "HEAD"]);
   return head.ok ? head.value.trim() : null;
 }
-function manifestTrusted(rootDir: string, content: string): boolean {
+function manifestTrusted(rootDir: string, content: string, options: TddLockOptions): boolean {
   const currentHash = digest(content);
   const useEnvironment = path.resolve(rootDir) === process.cwd();
-  const baselineRef = (useEnvironment ? process.env["CONTROL_GLASS_LOCK_BASE_REF"] ?? process.env["CONTROL_GLASS_BASE_REF"] : undefined) ?? "HEAD";
+  const dedicatedBase = useEnvironment ? process.env["CONTROL_GLASS_LOCK_BASE_REF"] : undefined;
+  const baselineRef = dedicatedBase ?? options.baseRef ?? (useEnvironment ? process.env["CONTROL_GLASS_BASE_REF"] : undefined) ?? "HEAD";
   if (baselineRef.startsWith("-")) return false;
   const baseline = readGit(rootDir, ["show", baselineRef + ":" + LOCK_FILE_REL_PATH]);
   if (baseline.ok && digest(baseline.value) === currentHash) return true;
@@ -61,14 +63,14 @@ export function writeTddLockManifest(rootDir: string = process.cwd(), options?: 
   return manifest;
 }
 
-export function verifyTddLock(rootDir: string = process.cwd()): { readonly passed: boolean; readonly violations: readonly string[] } {
+export function verifyTddLock(rootDir: string = process.cwd(), options: TddLockOptions = {}): { readonly passed: boolean; readonly violations: readonly string[] } {
   const fullLockPath = path.join(rootDir, LOCK_FILE_REL_PATH);
   if (!fs.existsSync(fullLockPath)) return { passed: false, violations: ["TDD manifest missing. Freeze tests explicitly during Phase 1."] };
   try {
     const content = fs.readFileSync(fullLockPath, "utf8");
     const manifest = ManifestSchema.parse(JSON.parse(content));
     const violations: string[] = [];
-    if (!manifestTrusted(rootDir, content)) violations.push("UNTRUSTED_TDD_MANIFEST: Requires an approved baseline or explicit Phase 1 freeze receipt.");
+    if (!manifestTrusted(rootDir, content, options)) violations.push("UNTRUSTED_TDD_MANIFEST: Requires an approved baseline or explicit Phase 1 freeze receipt.");
     for (const [relative, expected] of Object.entries(manifest.files)) {
       const absolute = path.resolve(rootDir, relative);
       const within = path.relative(path.resolve(rootDir), absolute);

@@ -38,7 +38,13 @@ The v2 digest sorts normalized relative paths and combines each path with the SH
 
 Verification compares the input digest before and after running its checks. Changes to any included input block successful evidence with `SOURCE_CHANGED_DURING_VERIFICATION`. Put generated command output in an excluded output or cache directory. Unreadable inputs and symlinks within the included scope fail provenance instead of being silently omitted; excluded dependency and output links remain outside that scope.
 
-The broader inventory and v2 record format change existing digest values. Generate fresh evidence after upgrading. Source analysis and safety scanning retain their existing file-selection rules.
+The broader inventory and v2 record format change existing digest values. Generate fresh evidence after upgrading. Source analysis retains its language-specific file-selection rules.
+
+## Safety scanning scope
+
+Safety scanning inspects regular text files outside the dependency, output, Git, and cache directories listed above, regardless of extension. Workflows, native configuration, scripts, JavaScript, extensionless files, documentation, and private-key files are included. Files containing NUL bytes are treated as binary inputs and are excluded from text scanning; the provenance digest still covers included binary inputs.
+
+Secret detection applies to documentation as well as executable/configuration files. Markdown, MDX, and reStructuredText are treated as prose for destructive-command and dynamic-evaluation examples. Findings identify the file, line, category, and rule description without reproducing the matched credential.
 
 ## Review the entire change
 
@@ -46,12 +52,16 @@ Use an explicit PR base and head:
 
 ```sh
 control-glass verify --base origin/main --head HEAD
-control-glass diff --base origin/main
+control-glass diff --base origin/main --head HEAD
 ```
 
 CI sets `CONTROL_GLASS_BASE_REF` and `CONTROL_GLASS_HEAD_REF`. The classifier compares the merge base with the requested head and includes both paths of a rename. Local checks without an explicit range inspect staged, unstaged, and untracked changes. They do not infer a PR from the most recent commit.
 
 Unavailable Git data blocks approval. Unregistered backend files receive at least Tier 1 even when changed alongside registered Tier 0 UI files. Critical contracts, verification code, policies, locks, and workflow changes require Tier 2. A Tier 0 classification alone does not authorize a merge; the full verification engine must supply successful gate results.
+
+UI logic requires at least Tier 1, including features declared as Tier 0. Automatic eligibility requires a verified formatting-only change to existing TypeScript/TSX UI files: both versions must parse, contain no source comments, and produce identical canonical syntax. Type changes, JSX text changes, automatic-semicolon changes, additions, deletions, and renames require review. An explicit filename-only report can retain its advisory Tier 0 classification when content is unavailable, but never grants automatic approval. Requested commit versions and pending working-tree changes are both considered.
+
+The `verify` and `diff` commands share strict parsing for `--base` and `--head`. Missing values, repeated flags, and unknown arguments fail before verification or classification starts.
 
 ## Freeze tests explicitly
 
@@ -69,7 +79,9 @@ control-glass lock --phase=spec-freeze
 
 The explicit freeze writes a manifest and a local receipt in Git metadata, bound to the current HEAD and manifest digest. Re-running `init` preserves an existing manifest. MCP does not expose a tool that rewrites test locks.
 
-Verification compares the manifest against the trusted baseline. Locally, a matching Phase 1 receipt authorizes the pending specification change. CI ignores local receipts. If a PR intentionally changes the lock, a trusted maintainer must configure the repository variable `CONTROL_GLASS_APPROVED_LOCK_SHA256` with the SHA-256 digest of the exact approved manifest, with CRLF normalized to LF. The generated workflow passes this variable into verification. `CONTROL_GLASS_LOCK_BASE_REF` can select a distinct trusted lock baseline.
+Verification compares the manifest against the trusted baseline. An explicit API/MCP `baseRef` or CLI `--base` is also passed to the TDD guard. For the current project, `CONTROL_GLASS_LOCK_BASE_REF` selects a distinct trusted lock baseline; otherwise an explicit base takes precedence over `CONTROL_GLASS_BASE_REF`, with `HEAD` used only when no base is supplied. Another project's verification does not inherit the current project's environment references.
+
+Locally, a matching Phase 1 receipt authorizes the pending specification change. CI ignores local receipts. If a PR intentionally changes the lock, a trusted maintainer must configure the repository variable `CONTROL_GLASS_APPROVED_LOCK_SHA256` with the SHA-256 digest of the exact approved manifest, with CRLF normalized to LF. The generated workflow passes this variable into verification.
 
 A hash alone does not establish who approved a specification. Protect the base branch, the workflow, and the repository variable. The local receipt supports the development workflow; the CI baseline and externally controlled digest establish the approval boundary.
 
@@ -83,6 +95,6 @@ The pre-commit hook rejects tracked unstaged changes so verification sees the st
 
 ## Source analysis boundaries
 
-The source, safety, and TDD gates share one file inventory, including root files and `cmd/`, while excluding dependencies, build output, and verification artifacts. TypeScript analysis resolves aliases, extensionless modules, TSX, reexports, and import-equals declarations.
+Source and TDD analysis cover supported language files, including root files and `cmd/`, while excluding dependencies, build output, and verification artifacts. Safety uses the broader text inventory described above. TypeScript analysis resolves aliases, extensionless modules, TSX, reexports, import-equals declarations, and static template-literal imports/requires. Python comma imports and aliases, and PHP aliased, comma-separated, and grouped namespace imports are recorded consistently by the linter and dependency mapper. Multiline string contents do not create dependencies.
 
-Comment removal preserves token separation and newlines. Non-TypeScript scanning tracks strings, Python triple-quoted text, Go raw strings, and PHP heredoc text. It is a lexical guardrail; required native static checks and tests remain responsible for language correctness. Review autofix diffs before committing.
+Comment removal preserves token separation and newlines. Go `//go:` compiler/tooling directives, `//line` directives, and build constraints are preserved as functional source metadata. Non-TypeScript scanning tracks strings, Python triple-quoted text, Go raw strings, and PHP heredoc text. It is a lexical guardrail; required native static checks and tests remain responsible for language correctness. Review autofix diffs before committing.

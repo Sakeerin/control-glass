@@ -6,7 +6,7 @@ import { loadCompilerOptions, resolveProjectImport } from "./module-resolver.js"
 import {
   collectPolyglotSourceFiles,
   detectLanguageFromFile,
-  extractImportsFromLine,
+  extractNonTsImports,
   type SupportedLanguage
 } from "./polyglot-engine.js";
 
@@ -115,7 +115,7 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
         if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression && ts.isStringLiteral(node.moduleReference.expression)) recordImport(node.moduleReference.expression.text);
         if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === "require"))) {
           const first = node.arguments[0];
-          if (first && ts.isStringLiteral(first)) recordImport(first.text);
+          if (first && ts.isStringLiteralLike(first)) recordImport(first.text);
         }
         if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
           for (const element of node.exportClause.elements) rawExports[relPath]?.push(element.name.text);
@@ -130,14 +130,10 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
       };
       visit(sf);
     } else {
-      for (const line of content.split(/\r?\n/)) {
-        for (const imp of extractImportsFromLine(line, lang)) {
-          rawImports[relPath]?.push(imp);
-          if (!reverseImports[imp]) {
-            reverseImports[imp] = new Set();
-          }
-          reverseImports[imp]?.add(relPath);
-        }
+      for (const { specifier } of extractNonTsImports(content, lang)) {
+        if (!rawImports[relPath]?.includes(specifier)) rawImports[relPath]?.push(specifier);
+        if (!reverseImports[specifier]) reverseImports[specifier] = new Set();
+        reverseImports[specifier]?.add(relPath);
       }
       rawExports[relPath]?.push(...extractNonTsExports(content, lang));
     }

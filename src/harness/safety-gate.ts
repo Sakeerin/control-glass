@@ -1,7 +1,7 @@
 import { isDirectExecution } from "./runtime.js";
 import fs from "node:fs";
 import path from "node:path";
-import { collectProjectFiles } from "./file-inventory.js";
+import { collectSafetyFiles } from "./file-inventory.js";
 
 export interface SafetyFinding {
   readonly file: string;
@@ -49,17 +49,20 @@ export function runSafetyGate(rootDir: string = process.cwd()): {
   readonly scannedFiles: number;
   readonly findings: readonly SafetyFinding[];
 } {
-  const files = collectProjectFiles(rootDir);
+  const files = collectSafetyFiles(rootDir);
   const findings: SafetyFinding[] = [];
+  let scannedFiles = 0;
 
   for (const filePath of files) {
     const relativePath = path.relative(rootDir, filePath).split(path.sep).join("/");
-    if (relativePath === "src/harness/safety-gate.ts") {
-      continue;
-    }
-    const lines = fs.readFileSync(filePath, "utf8").split(/\r?\n/);
+    const bytes = fs.readFileSync(filePath);
+    if (bytes.includes(0)) continue;
+    scannedFiles++;
+    const documentation = /\.(?:md|mdx|rst)$/i.test(relativePath);
+    const lines = bytes.toString("utf8").split(/\r?\n/);
     lines.forEach((lineText, idx) => {
       for (const rule of SAFETY_PATTERNS) {
+        if (documentation && rule.category !== "SECRET_LEAK") continue;
         if (rule.regex.test(lineText)) {
           findings.push({
             file: relativePath,
@@ -74,7 +77,7 @@ export function runSafetyGate(rootDir: string = process.cwd()): {
 
   return {
     passed: findings.length === 0,
-    scannedFiles: files.length,
+    scannedFiles,
     findings
   };
 }
