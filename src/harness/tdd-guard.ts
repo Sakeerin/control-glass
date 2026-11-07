@@ -2,7 +2,9 @@ import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
 import { z } from "zod";
-import { collectProjectFiles, isTestFile, isContractFile } from "./file-inventory.js";
+import { collectSafetyFiles, isTestFile, isContractFile } from "./file-inventory.js";
+import { loadCommandConfig } from "./project-config.js";
+import { decodeProjectText } from "./text-decoder.js";
 import { readGit, isDirectExecution } from "./runtime.js";
 
 const ManifestSchema = z.object({ updatedAt: z.string(), files: z.record(z.string().regex(/^[a-f0-9]{64}$/)) });
@@ -16,7 +18,27 @@ function digest(text: string): string {
   return crypto.createHash("sha256").update(text.replace(/\r\n/g, "\n"), "utf8").digest("hex");
 }
 function lockedFiles(rootDir: string): string[] {
-  return collectProjectFiles(rootDir).filter(file => isTestFile(path.basename(file)) || isContractFile(path.basename(file)));
+  const root = path.resolve(rootDir);
+  const inventory = collectSafetyFiles(root);
+  const files = inventory.filter(file => isTestFile(path.basename(file)) || isContractFile(path.basename(file)) ||
+    path.relative(root, file).split(path.sep).slice(0, -1).some(segment => /^(?:tests?|specs?|__tests__|fixtures|__fixtures__)$/.test(segment)));
+  const declared = loadCommandConfig(root).testLockFiles;
+  if (declared !== undefined) {
+    for (const relative of declared) {
+      const absolute = path.resolve(root, relative);
+      const within = path.relative(root, absolute);
+      if (path.isAbsolute(relative) || path.win32.isAbsolute(relative) || within === ".." || within.startsWith(".." + path.sep) || path.isAbsolute(within) || !inventory.includes(absolute)) throw new Error("INVALID_TEST_LOCK_INPUT: " + relative);
+      files.push(absolute);
+    }
+    files.push(path.join(root, "control-glass.config.json"));
+  }
+  return [...new Set(files)].sort();
+}
+function fileDigest(file: string): string {
+  const bytes = fs.readFileSync(file);
+  let text: string | null;
+  try { text = decodeProjectText(bytes); } catch { text = null; }
+  return text === null ? crypto.createHash("sha256").update(bytes).digest("hex") : digest(text);
 }
 function receiptPath(rootDir: string): string | null {
   const result = readGit(rootDir, ["rev-parse", "--git-path", "control-glass/spec-freeze.json"]);
@@ -50,7 +72,7 @@ export function writeTddLockManifest(rootDir: string = process.cwd(), options?: 
   if (options.phase === "initialization" && fs.existsSync(fullLockPath)) return ManifestSchema.parse(JSON.parse(fs.readFileSync(fullLockPath, "utf8")));
   if (path.resolve(rootDir) === process.cwd() && process.env["CI"] === "true") throw new Error("SPEC_FREEZE_IS_NOT_ALLOWED_IN_CI");
   const files: Record<string, string> = {};
-  for (const file of lockedFiles(rootDir)) files[path.relative(rootDir, file).split(path.sep).join("/")] = digest(fs.readFileSync(file, "utf8"));
+  for (const file of lockedFiles(rootDir)) files[path.relative(rootDir, file).split(path.sep).join("/")] = fileDigest(file);
   const manifest: TddLockManifest = { updatedAt: new Date().toISOString(), files };
   const content = JSON.stringify(manifest, null, 2) + "\n";
   fs.mkdirSync(path.dirname(fullLockPath), { recursive: true });
@@ -76,7 +98,7 @@ export function verifyTddLock(rootDir: string = process.cwd(), options: TddLockO
       const within = path.relative(path.resolve(rootDir), absolute);
       if (path.isAbsolute(relative) || within.startsWith("..") || path.isAbsolute(within)) { violations.push("INVALID_LOCK_PATH"); continue; }
       if (!fs.existsSync(absolute)) violations.push("Locked file deleted: " + relative);
-      else if (digest(fs.readFileSync(absolute, "utf8")) !== expected) violations.push("Locked file modified: " + relative);
+      else if (fs.lstatSync(absolute).isSymbolicLink() || fileDigest(absolute) !== expected) violations.push("Locked file modified: " + relative);
     }
     for (const file of lockedFiles(rootDir)) {
       const relative = path.relative(rootDir, file).split(path.sep).join("/");

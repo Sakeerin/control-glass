@@ -30,7 +30,7 @@ describe("Universal Multi-Vendor AI Gateway & MCP Protocol", () => {
     expect(claudeReq.ok).toBe(true);
     if (claudeReq.ok) {
       expect(claudeReq.value.headers["x-api-key"]).toBe("test-claude-key");
-      expect(claudeReq.value.body["model"]).toBe("claude-3-7-sonnet-latest");
+      expect(claudeReq.value.body["model"]).toBe("claude-sonnet-4-6");
     }
 
     const openaiCfg = createVendorModelConfig("openai");

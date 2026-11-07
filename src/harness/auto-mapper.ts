@@ -3,6 +3,7 @@ import fs from "node:fs";
 import path from "node:path";
 import ts from "typescript";
 import { loadCompilerOptions, resolveProjectImport } from "./module-resolver.js";
+import { collectModuleReferences } from "./module-references.js";
 import {
   collectPolyglotSourceFiles,
   detectLanguageFromFile,
@@ -23,6 +24,7 @@ export interface DependencyGraphArtifact {
   readonly generatedAt: string;
   readonly totalFiles: number;
   readonly nodes: Record<string, FileDependencyNode>;
+  readonly unresolvedImports: readonly { readonly file: string; readonly line: number }[];
 }
 
 function classifyLayer(relPath: string): FileDependencyNode["layer"] {
@@ -81,6 +83,7 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
   const rawExports: Record<string, string[]> = {};
   const fileLangs: Record<string, SupportedLanguage> = {};
   const reverseImports: Record<string, Set<string>> = {};
+  const unresolvedImports: { file: string; line: number }[] = [];
 
   for (const absPath of srcFiles) {
     const relPath = path.relative(rootDir, absPath).split(path.sep).join("/");
@@ -111,12 +114,6 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
         reverseImports[target]?.add(relPath);
       };
       const visit = (node: ts.Node): void => {
-        if ((ts.isImportDeclaration(node) || ts.isExportDeclaration(node)) && node.moduleSpecifier && ts.isStringLiteral(node.moduleSpecifier)) recordImport(node.moduleSpecifier.text);
-        if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression && ts.isStringLiteral(node.moduleReference.expression)) recordImport(node.moduleReference.expression.text);
-        if (ts.isCallExpression(node) && (node.expression.kind === ts.SyntaxKind.ImportKeyword || (ts.isIdentifier(node.expression) && node.expression.text === "require"))) {
-          const first = node.arguments[0];
-          if (first && ts.isStringLiteralLike(first)) recordImport(first.text);
-        }
         if (ts.isExportDeclaration(node) && node.exportClause && ts.isNamedExports(node.exportClause)) {
           for (const element of node.exportClause.elements) rawExports[relPath]?.push(element.name.text);
         }
@@ -129,6 +126,10 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
         ts.forEachChild(node, visit);
       };
       visit(sf);
+      for (const reference of collectModuleReferences(sf)) {
+        if (reference.specifier === null) unresolvedImports.push({ file: relPath, line: sf.getLineAndCharacterOfPosition(reference.position).line + 1 });
+        else recordImport(reference.specifier);
+      }
     } else {
       for (const { specifier } of extractNonTsImports(content, lang)) {
         if (!rawImports[relPath]?.includes(specifier)) rawImports[relPath]?.push(specifier);
@@ -154,7 +155,8 @@ export function buildDependencyGraph(rootDir: string = process.cwd()): Dependenc
   const artifact: DependencyGraphArtifact = {
     generatedAt: new Date().toISOString(),
     totalFiles: Object.keys(nodes).length,
-    nodes
+    nodes,
+    unresolvedImports
   };
 
   const outPath = path.join(rootDir, ".control-glass", "dependency-graph.json");

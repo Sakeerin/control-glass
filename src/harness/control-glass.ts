@@ -13,6 +13,7 @@ import { verifyTddLock } from "./tdd-guard.js";
 import { loadCommandConfig } from "./project-config.js";
 import { collectProvenanceFiles } from "./file-inventory.js";
 import { isDirectExecution, readGit } from "./runtime.js";
+import { createSecretRedactor, redactReportStrings } from "./secret-redaction.js";
 
 export type GateStatus = "passed" | "failed" | "skipped" | "error";
 export interface CommandExecution {
@@ -48,7 +49,7 @@ export interface EmpiricalEvidenceArtifact {
     readonly unitAndContractTests: CommandGateResult & { readonly summary: string };
   };
   readonly provenance: { readonly gitHead: string | null; readonly sourceTreeHash: string; readonly nodeVersion: string; readonly toolVersion: string };
-  readonly dependencyGraphSummary: { readonly totalMappedFiles: number };
+  readonly dependencyGraphSummary: { readonly totalMappedFiles: number; readonly unresolvedImportCount: number };
   readonly phase3Orchestration: DiffReviewReport;
 }
 
@@ -72,16 +73,17 @@ export function resolvePolyglotGateCommands(rootDir: string): PolyglotGateComman
 }
 
 function runCommands(rootDir: string, commands: readonly string[], timeoutMs: number): CommandGateResult {
+  const redact = createSecretRedactor();
   if (commands.length === 0) return { passed: false, status: "skipped", output: "Required gate has no configured command.", commands: [] };
   const executions: CommandExecution[] = [];
   for (const command of commands) {
     const started = performance.now();
     try {
       const output = execSync(command, { cwd: rootDir, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"], timeout: timeoutMs, maxBuffer: 16 * 1024 * 1024 }).trim();
-      executions.push({ command, passed: true, status: "passed", output, durationMs: Math.round(performance.now() - started) });
+      executions.push({ command: redact(command), passed: true, status: "passed", output: redact(output), durationMs: Math.round(performance.now() - started) });
     } catch (error: unknown) {
       const failure = error as { stdout?: string; stderr?: string; message?: string; status?: number | null };
-      executions.push({ command, passed: false, status: failure.status === null || failure.status === undefined ? "error" : "failed", output: [failure.stdout ?? "", failure.stderr ?? "", failure.message ?? ""].join("\n").trim(), durationMs: Math.round(performance.now() - started) });
+      executions.push({ command: redact(command), passed: false, status: failure.status === null || failure.status === undefined ? "error" : "failed", output: redact([failure.stdout ?? "", failure.stderr ?? "", failure.message ?? ""].join("\n").trim()), durationMs: Math.round(performance.now() - started) });
     }
   }
   const passed = executions.every(command => command.passed);
@@ -90,7 +92,7 @@ function runCommands(rootDir: string, commands: readonly string[], timeoutMs: nu
 
 function attempt<T>(operation: () => T, fallback: T, errors: string[], name: string): T {
   try { return operation(); }
-  catch (error: unknown) { errors.push(name + ": " + (error instanceof Error ? error.message : "Unexpected error")); return fallback; }
+  catch (error: unknown) { errors.push(name + ": " + createSecretRedactor()(error instanceof Error ? error.message : "Unexpected error")); return fallback; }
 }
 
 function hashProjectSource(rootDir: string): string {
@@ -116,19 +118,19 @@ export function runControlGlass(rootDir: string = process.cwd(), options: Contro
   const deslop = attempt(() => runDeslopEngine(rootDir), { passed: false, scannedFiles: 0, cleanedCommentCount: 0, issues: [] }, errors, "Deslop");
   const tdd = attempt(() => verifyTddLock(rootDir, options), { passed: false, violations: ["TDD gate failed unexpectedly."] }, errors, "TDD");
   const tests = safety.passed ? runCommands(rootDir, commands.testCommands, config.timeoutMs) : blockedCommands;
-  const graph = attempt(() => buildDependencyGraph(rootDir), { totalFiles: 0, generatedAt: new Date().toISOString(), nodes: {} }, errors, "Dependency mapping");
+  const graph = attempt(() => buildDependencyGraph(rootDir), { totalFiles: 0, generatedAt: new Date().toISOString(), nodes: {}, unresolvedImports: [] }, errors, "Dependency mapping");
   const sourceTreeHash = attempt(() => hashProjectSource(rootDir), "unavailable", errors, "Source provenance");
   if (sourceTreeHash !== initialSourceHash) errors.push("SOURCE_CHANGED_DURING_VERIFICATION");
   const gatesPassed = typecheck.passed && dune.passed && deslop.passed && safety.passed && tdd.passed && tests.passed && errors.length === 0;
   const diff = analyzeDiffAndTier(rootDir, undefined, { ...options, gatesPassed });
   const head = readGit(rootDir, ["rev-parse", "--verify", "HEAD"]);
-  const artifact: EmpiricalEvidenceArtifact = {
+  const artifact: EmpiricalEvidenceArtifact = redactReportStrings({
     timestamp: new Date().toISOString(), durationMs: Math.round(performance.now() - started), detectedLanguages,
     overallPassed: gatesPassed && diff.status === "known" && errors.length === 0, errors,
     gates: { typecheck, duneAstLinter: { ...dune, violationCount: dune.violations.length }, deslopEngine: { ...deslop, issueCount: deslop.issues.length }, safetyAndSecretGate: { ...safety, findingCount: safety.findings.length }, tddContractLock: tdd, unitAndContractTests: { ...tests, summary: tests.passed ? "All configured test commands passed." : tests.output } },
     provenance: { gitHead: head.ok ? head.value.trim() : null, sourceTreeHash, nodeVersion: process.version, toolVersion: "3.0.0" },
-    dependencyGraphSummary: { totalMappedFiles: graph.totalFiles }, phase3Orchestration: diff
-  };
+    dependencyGraphSummary: { totalMappedFiles: graph.totalFiles, unresolvedImportCount: graph.unresolvedImports.length }, phase3Orchestration: diff
+  });
   const evidencePath = path.join(rootDir, ".control-glass/evidence-latest.json");
   fs.mkdirSync(path.dirname(evidencePath), { recursive: true });
   fs.writeFileSync(evidencePath + ".tmp", JSON.stringify(artifact, null, 2) + "\n", "utf8");

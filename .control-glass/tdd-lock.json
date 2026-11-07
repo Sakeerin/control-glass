@@ -1,5 +1,5 @@
 {
-  "updatedAt": "2026-11-06T03:31:22.317Z",
+  "updatedAt": "2026-11-07T15:29:20.982Z",
   "files": {
     "src/core/contracts.ts": "b4a7079cd58b8ac815dce0dd338ce02d8d48e2b7407e541bbfe602a57d91aef5",
     "tests/analysis-regressions.spec.ts": "978f769728d1e03e0247c6dd36869711e39b3200b8ae99db39b10272a84ec9ca",
@@ -7,10 +7,11 @@
     "tests/control-regressions.spec.ts": "fd0e39376052a000343388ef0c015f4595657168825b16e313c0d6119234e338",
     "tests/diff-paths.spec.ts": "7b240645cc12b32ced2a5b3c9d11af3ea6b430355515f79317d4d78309103088",
     "tests/harness-guardrails.spec.ts": "4a94f32b86cec12001089dc857bfd065ca71b320a8e10e61f7c626993aa15737",
-    "tests/multi-vendor.spec.ts": "045563ba9ae075f5bc522426607fa1a2195399558a7b8210fd3ea0d7e7644fe7",
+    "tests/multi-vendor.spec.ts": "f0ba1894a13092fe13bd9902650404463ce8da2f49140a655b7e46d322eeafff",
     "tests/polyglot-contracts.spec.ts": "6d2114edc734b647f91e1613750c5d0af7e753d57332dc2397ac95d5afde4960",
     "tests/polyglot-engine.spec.ts": "b159c59f102d00ddfc184a945d0fae4c43b989712f3dabc9f8d5d963bfa9fda9",
     "tests/provenance-coverage.spec.ts": "d018a0af77ccb91e1d1079c13888aead865f37896b94daedbc7809f1d6fc6962",
-    "tests/review-fixtures.contract.ts": "c8a024ac26fdd9bedf2bd9dfbf2aee8e58bf28e490bd782463f924cdc19ef4a4"
+    "tests/review-fixtures.contract.ts": "c8a024ac26fdd9bedf2bd9dfbf2aee8e58bf28e490bd782463f924cdc19ef4a4",
+    "tests/verification-inputs.spec.ts": "f46b32c0f60b34ce0f5574d8bbc44e6a505c19a5a0df70233f099296555ae735"
   }
 }

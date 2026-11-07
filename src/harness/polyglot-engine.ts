@@ -2,6 +2,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { collectProjectFiles, isSourceFile, isTestFile } from "./file-inventory.js";
 import { tokenizeNonTypeScript, replaceSourceRanges } from "./source-analysis.js";
+import { parsePythonImports } from "./native-source-parser.js";
 
 export type SupportedLanguage = "typescript" | "python" | "go" | "php";
 
@@ -153,6 +154,7 @@ export function extractImportsFromLine(
 }
 
 export function extractNonTsImports(sourceText: string, lang: Exclude<SupportedLanguage, "typescript">): { readonly specifier: string; readonly line: number }[] {
+  if (lang === "python") return parsePythonImports(sourceText);
   const tokenized = tokenizeNonTypeScript(sourceText, lang);
   const code = tokenized.code;
   const imports: { specifier: string; line: number }[] = [];
@@ -172,9 +174,9 @@ export function extractNonTsImports(sourceText: string, lang: Exclude<SupportedL
     let inGoImports = false;
     code.split(/\r?\n/).forEach((codeLine, index) => {
       if (lang === "go" && /^\s*import\s*\(/.test(codeLine)) inGoImports = true;
-      const importLine = lang === "python" ? /^\s*(?:import|from)\b/.test(codeLine) : inGoImports || /^\s*import\b/.test(codeLine);
+      const importLine = inGoImports || /^\s*import\b/.test(codeLine);
       if (importLine) {
-        const statement = lang === "python" ? codeLine : rawLines[index] ?? "";
+        const statement = rawLines[index] ?? "";
         for (const specifier of extractImportsFromLine(statement, lang)) imports.push({ specifier, line: index + 1 });
       }
       if (lang === "go" && /\)/.test(codeLine)) inGoImports = false;

@@ -33,7 +33,7 @@ const DEFAULT_VENDOR_ENDPOINTS: Record<AiVendorId, string> = {
 };
 
 const DEFAULT_VENDOR_MODELS: Record<AiVendorId, string> = {
-  anthropic: "claude-3-7-sonnet-latest",
+  anthropic: "claude-sonnet-4-6",
   openai: "gpt-4o",
   gemini: "gemini-2.5-pro",
   "openai-compatible": "deepseek-r1"
@@ -46,11 +46,17 @@ const DEFAULT_VENDOR_ENV_KEYS: Record<AiVendorId, string> = {
   "openai-compatible": "OPENAI_COMPATIBLE_API_KEY"
 };
 
+function isRetiredPublicModel(vendor: AiVendorId, model: string, endpoint: string): boolean {
+  if (vendor !== "anthropic" || !["claude-3-7-sonnet-latest", "claude-3-7-sonnet-20250219"].includes(model)) return false;
+  try { return new URL(endpoint).hostname.toLowerCase() === "api.anthropic.com"; }
+  catch { return false; }
+}
+
 export function createVendorModelConfig(
   vendor: AiVendorId,
   customModelId?: string,
   customEndpointUrl?: string
-): Result<VendorModelConfig, "EMPTY_TEXT_FORBIDDEN"> {
+): Result<VendorModelConfig, "EMPTY_TEXT_FORBIDDEN" | "RETIRED_VENDOR_MODEL"> {
   const modelRes = createNonEmptyText(
     customModelId ?? DEFAULT_VENDOR_MODELS[vendor]
   );
@@ -58,10 +64,12 @@ export function createVendorModelConfig(
     return modelRes;
   }
 
+  const endpointUrl = customEndpointUrl ?? DEFAULT_VENDOR_ENDPOINTS[vendor];
+  if (isRetiredPublicModel(vendor, modelRes.value, endpointUrl)) return err("RETIRED_VENDOR_MODEL");
   return ok({
     vendor,
     modelId: modelRes.value,
-    endpointUrl: customEndpointUrl ?? DEFAULT_VENDOR_ENDPOINTS[vendor],
+    endpointUrl,
     apiKeyEnvVar: DEFAULT_VENDOR_ENV_KEYS[vendor]
   });
 }
@@ -71,7 +79,8 @@ export function buildVendorRequestPayload(
   systemPrompt: NonEmptyText,
   userPrompt: NonEmptyText,
   apiKey: string
-): Result<VendorRequestPayload, "MISSING_VENDOR_API_KEY"> {
+): Result<VendorRequestPayload, "MISSING_VENDOR_API_KEY" | "RETIRED_VENDOR_MODEL"> {
+  if (isRetiredPublicModel(config.vendor, config.modelId, config.endpointUrl)) return err("RETIRED_VENDOR_MODEL");
   if (config.vendor !== "openai-compatible" && apiKey.trim().length === 0) {
     return err("MISSING_VENDOR_API_KEY");
   }

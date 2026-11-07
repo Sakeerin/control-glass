@@ -5,6 +5,7 @@ import ts from "typescript";
 import { typeScriptComments } from "./source-analysis.js";
 import { loadCompilerOptions, resolveProjectImport } from "./module-resolver.js";
 import { loadFeatureMap } from "./project-config.js";
+import { collectModuleReferences, containsUncheckedType } from "./module-references.js";
 import {
   collectPolyglotSourceFiles,
   detectLanguageFromFile,
@@ -144,9 +145,9 @@ function checkAstRules(
       });
     }
 
-    if (ts.isAsExpression(node)) {
+    if (ts.isAsExpression(node) || ts.isTypeAssertionExpression(node)) {
       const typeText = node.type.getText(sourceFile);
-      if (typeText === "any" || typeText === "unknown") {
+      if (containsUncheckedType(node.type)) {
         violations.push({
           file: relativePath,
           line: getLineNumber(sourceFile, node.getStart(sourceFile)),
@@ -170,60 +171,16 @@ function checkAstRules(
       });
     }
 
-    if (ts.isImportEqualsDeclaration(node) && ts.isExternalModuleReference(node.moduleReference) && node.moduleReference.expression && ts.isStringLiteral(node.moduleReference.expression)) {
-      checkModuleSpecifierAgainstBoundaries(sourceFile, node.getStart(sourceFile), relativePath, node.moduleReference.expression.text, boundaries, violations, resolveImport);
-    }
-
-    if (ts.isImportDeclaration(node) && ts.isStringLiteral(node.moduleSpecifier)) {
-      checkModuleSpecifierAgainstBoundaries(
-        sourceFile,
-        node.getStart(sourceFile),
-        relativePath,
-        node.moduleSpecifier.text,
-        boundaries,
-        violations,
-        resolveImport
-      );
-    }
-
-    if (
-      ts.isExportDeclaration(node) &&
-      node.moduleSpecifier &&
-      ts.isStringLiteral(node.moduleSpecifier)
-    ) {
-      checkModuleSpecifierAgainstBoundaries(
-        sourceFile,
-        node.getStart(sourceFile),
-        relativePath,
-        node.moduleSpecifier.text,
-        boundaries,
-        violations,
-        resolveImport
-      );
-    }
-
-    if (ts.isCallExpression(node) && node.arguments.length >= 1) {
-      const firstArg = node.arguments[0];
-      const isDynamicImport = node.expression.kind === ts.SyntaxKind.ImportKeyword;
-      const isRequireCall =
-        ts.isIdentifier(node.expression) && node.expression.text === "require";
-      if ((isDynamicImport || isRequireCall) && firstArg && ts.isStringLiteralLike(firstArg)) {
-        checkModuleSpecifierAgainstBoundaries(
-          sourceFile,
-          node.getStart(sourceFile),
-          relativePath,
-          firstArg.text,
-          boundaries,
-          violations,
-          resolveImport
-        );
-      }
-    }
-
     ts.forEachChild(node, visit);
   }
 
   visit(sourceFile);
+  const restricted = relativePath.startsWith("src/ui/") || relativePath.endsWith(".tsx") || relativePath.startsWith("src/components/") || relativePath.startsWith("components/") ||
+    Object.values(boundaries).some(boundary => relativePath.startsWith(boundary.pathPrefix) && boundary.forbiddenImports.length > 0);
+  for (const reference of collectModuleReferences(sourceFile)) {
+    if (reference.specifier !== null) checkModuleSpecifierAgainstBoundaries(sourceFile, reference.position, relativePath, reference.specifier, boundaries, violations, resolveImport);
+    else if (restricted) violations.push({ file: relativePath, line: getLineNumber(sourceFile, reference.position), ruleId: "DUNE_BOUNDARY_VIOLATION", message: "Cannot verify the target of a dynamic module reference in a restricted layer." });
+  }
   return violations;
 }
 
@@ -266,7 +223,8 @@ export function runDuneLinter(rootDir: string = process.cwd()): {
       violations.push(...checkNoComments(sourceFile, relativePath));
       violations.push(...checkAstRules(sourceFile, relativePath, boundaries, resolveImport));
     } else if (lang === "python" || lang === "go" || lang === "php") {
-      violations.push(...lintNonTsSourceText(content, relativePath, lang, boundaries));
+      try { violations.push(...lintNonTsSourceText(content, relativePath, lang, boundaries)); }
+      catch { violations.push({ file: relativePath, line: 1, ruleId: "DUNE_INVALID_SYNTAX", message: "Native source parsing failed; install the required runtime and check source syntax." }); }
     }
   }
 

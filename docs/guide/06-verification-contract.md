@@ -6,6 +6,8 @@
 
 Missing executables, invalid configuration, unavailable diff information, failed commands, and required checks without commands prevent overall success. A skipped check is not a pass. Evidence records each executed command, output, duration, and status, together with the source digest, Git HEAD, Node version, and Control Glass version.
 
+Command output and evidence text are redacted before being returned by the library or saved to disk. MCP tool payloads and CLI errors use the same redaction rules. Recognized API/cloud tokens, complete private-key blocks, and values of environment variables whose names contain `KEY`, `TOKEN`, `SECRET`, `PASSWORD`, `PASSWD`, or `CREDENTIAL` are replaced with `[REDACTED]`, including JSON-escaped credential values. Redaction preserves pass/fail results. It covers these recognized patterns and known environment credentials; arbitrary secrets with unrelated formats and names require additional rules.
+
 Node projects use their existing `npm test` script. TypeScript projects with `tsconfig.json` use the installed TypeScript compiler. Python uses `mypy` and `pytest`; Go uses `go vet` and `go test`; PHP uses the project's PHPStan and PHPUnit executables. Declare and install these tools in the consumer project.
 
 Override command selection explicitly with `control-glass.config.json`:
@@ -42,7 +44,7 @@ The broader inventory and v2 record format change existing digest values. Genera
 
 ## Safety scanning scope
 
-Safety scanning inspects regular text files outside the dependency, output, Git, and cache directories listed above, regardless of extension. Workflows, native configuration, scripts, JavaScript, extensionless files, documentation, and private-key files are included. Files containing NUL bytes are treated as binary inputs and are excluded from text scanning; the provenance digest still covers included binary inputs.
+Safety scanning inspects regular text files outside the dependency, output, Git, and cache directories listed above, regardless of extension. Workflows, native configuration, scripts, JavaScript, extensionless files, documentation, and private-key files are included. UTF-8 text, UTF-8 BOM, and BOM-marked UTF-16 LE/BE text are decoded before scanning. Malformed BOM-marked text fails verification. Other inputs with NUL bytes or invalid UTF-8 are treated as binary and excluded from text scanning; the provenance digest still covers included binary inputs.
 
 Secret detection applies to documentation as well as executable/configuration files. Markdown, MDX, and reStructuredText are treated as prose for destructive-command and dynamic-evaluation examples. Findings identify the file, line, category, and rule description without reproducing the matched credential.
 
@@ -63,6 +65,8 @@ UI logic requires at least Tier 1, including features declared as Tier 0. Automa
 
 The `verify` and `diff` commands share strict parsing for `--base` and `--head`. Missing values, repeated flags, and unknown arguments fail before verification or classification starts.
 
+An explicit head requires an effective base from the API/CLI or the current project's environment. Without one, local classification fails with `HEAD_REQUIRES_BASE_REF`; CI retains `CI_REQUIRES_EXPLICIT_BASE_REF`. A head is never silently discarded in favor of working-tree changes.
+
 ## Freeze tests explicitly
 
 During an approved Phase 1, write requirements and failing tests, then run:
@@ -78,6 +82,10 @@ control-glass lock --phase=spec-freeze
 ```
 
 The explicit freeze writes a manifest and a local receipt in Git metadata, bound to the current HEAD and manifest digest. Re-running `init` preserves an existing manifest. MCP does not expose a tool that rewrites test locks.
+
+The lock includes named test/contract files and every regular file under `test`, `tests`, `__tests__`, `spec`, `specs`, `fixtures`, and `__fixtures__` directories at any depth, subject to the inventory exclusions above. Helpers, expected data, and binary fixtures are protected against edits, additions, deletion, and renaming. Decoded text normalizes CRLF to LF for hashing; binary and malformed text inputs use their exact bytes.
+
+Declare additional files outside those directories with `"testLockFiles": ["support/expected.json"]` in `control-glass.config.json` before freezing. This also locks the selecting configuration. Entries must identify existing regular files inside the included workspace inventory; absolute, escaping, missing, symlinked, and excluded dependency/output paths are rejected before the previous manifest is overwritten. No glob expansion occurs. Existing projects must approve a new Phase 1 freeze to cover newly included inputs.
 
 Verification compares the manifest against the trusted baseline. An explicit API/MCP `baseRef` or CLI `--base` is also passed to the TDD guard. For the current project, `CONTROL_GLASS_LOCK_BASE_REF` selects a distinct trusted lock baseline; otherwise an explicit base takes precedence over `CONTROL_GLASS_BASE_REF`, with `HEAD` used only when no base is supplied. Another project's verification does not inherit the current project's environment references.
 
@@ -95,6 +103,8 @@ The pre-commit hook rejects tracked unstaged changes so verification sees the st
 
 ## Source analysis boundaries
 
-Source and TDD analysis cover supported language files, including root files and `cmd/`, while excluding dependencies, build output, and verification artifacts. Safety uses the broader text inventory described above. TypeScript analysis resolves aliases, extensionless modules, TSX, reexports, import-equals declarations, and static template-literal imports/requires. Python comma imports and aliases, and PHP aliased, comma-separated, and grouped namespace imports are recorded consistently by the linter and dependency mapper. Multiline string contents do not create dependencies.
+Source analysis covers supported language files, including root files and `cmd/`, while excluding dependencies, build output, and verification artifacts. TDD and safety use their broader inventories described above. TypeScript analysis resolves aliases, extensionless modules, TSX, reexports, import-equals declarations, native require aliases, `module.require`, and statically resolvable dynamic imports, including parentheses, constant concatenations, and template expressions. Constant lookup respects lexical scope. Unresolved dynamic references are listed in the graph's `unresolvedImports`; they fail boundary enforcement in restricted layers. Assertions containing `unknown` or `any`, including angle-bracket, parenthesized, and nested generic forms, are rejected.
 
-Comment removal preserves token separation and newlines. Go `//go:` compiler/tooling directives, `//line` directives, and build constraints are preserved as functional source metadata. Non-TypeScript scanning tracks strings, Python triple-quoted text, Go raw strings, and PHP heredoc text. It is a lexical guardrail; required native static checks and tests remain responsible for language correctness. Review autofix diffs before committing.
+Python imports are parsed with the native `ast` module, including semicolon-separated statements, continuations, parenthesized imports, and aliases. PHP uses its native tokenizer for strings, comments, heredoc terminators, and namespace import analysis. `python` and `php` with the tokenizer extension must be available on PATH when analyzing those languages. Python runs in isolated mode; PHP disables local INI loading and loads the tokenizer explicitly if needed. Project source is parsed as data and is never executed by either analyzer. Missing parsers and syntax errors fail analysis.
+
+Comment removal preserves token separation and newlines. Go `//go:` compiler/tooling directives, `//line` directives, and build constraints are preserved as functional source metadata. Non-TypeScript scanning tracks strings, Python triple-quoted text, Go raw strings, and PHP heredoc text. Required native static checks and tests remain responsible for full language correctness beyond these guardrails. Review autofix diffs before committing.

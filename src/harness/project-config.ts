@@ -11,6 +11,7 @@ const FeatureMapSchema = z.object({ architecturalBoundaries: z.record(BoundarySc
 const CommandConfigSchema = z.object({
   staticCheckCommands: z.array(z.string().trim().min(1)).optional(),
   testCommands: z.array(z.string().trim().min(1)).optional(),
+  testLockFiles: z.array(z.string().min(1)).optional(),
   timeoutMs: z.number().int().min(100).max(3_600_000).default(120_000)
 }).strict();
 

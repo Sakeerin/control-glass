@@ -2,6 +2,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import { isDirectExecution } from "./runtime.js";
+import { createSecretRedactor } from "./secret-redaction.js";
 import {
   buildVendorRequestPayload,
   createVendorModelConfig,
@@ -173,7 +174,11 @@ Commands:
 `);
 }
 
-if (isDirectExecution(import.meta.url)) {
+function reportCliError(message: string): void {
+  console.error(createSecretRedactor()(message));
+}
+
+function runCli(): void {
   const cmd = process.argv[2] ?? "verify";
   const cwd = process.cwd();
 
@@ -186,7 +191,7 @@ if (isDirectExecution(import.meta.url)) {
           : undefined;
       if (langVal !== undefined && !["typescript", "ts", "python", "go", "php", "all"].includes(langVal)) throw new Error("UNSUPPORTED_LANGUAGE");
       const res = initControlGlassProject(cwd, langVal);
-      if (res.conflicts.length > 0) { console.error("Preserved conflicting files: " + res.conflicts.join(", ")); process.exitCode = 1; }
+      if (res.conflicts.length > 0) { reportCliError("Preserved conflicting files: " + res.conflicts.join(", ")); process.exitCode = 1; }
       console.log(`✅ Control Glass initialized (${res.createdFiles.length} files configured).`);
       break;
     }
@@ -198,7 +203,7 @@ if (isDirectExecution(import.meta.url)) {
     }
     case "sync-vendors": {
       const report = syncVendorConfigs(cwd);
-      if (report.conflicts.length > 0) { console.error("Preserved conflicting files: " + report.conflicts.join(", ")); process.exitCode = 1; }
+      if (report.conflicts.length > 0) { reportCliError("Preserved conflicting files: " + report.conflicts.join(", ")); process.exitCode = 1; }
       console.log(
         `🌐 Synced Multi-Vendor AI configs (${report.syncedTargets.join(", ")}):\n  - ${report.generatedFiles.join("\n  - ")}`
       );
@@ -234,7 +239,7 @@ if (isDirectExecution(import.meta.url)) {
       const res = runDuneLinter(cwd);
       if (!res.passed) {
         for (const v of res.violations) {
-          console.error(`  [${v.ruleId}] ${v.file}:${v.line} — ${v.message}`);
+          reportCliError(`  [${v.ruleId}] ${v.file}:${v.line} — ${v.message}`);
         }
         process.exit(1);
       }
@@ -249,7 +254,7 @@ if (isDirectExecution(import.meta.url)) {
       }
       if (!res.passed) {
         for (const issue of res.issues) {
-          console.error(`  [${issue.kind}] ${issue.file}:${issue.line} — ${issue.description}`);
+          reportCliError(`  [${issue.kind}] ${issue.file}:${issue.line} — ${issue.description}`);
         }
         process.exit(1);
       }
@@ -277,7 +282,7 @@ if (isDirectExecution(import.meta.url)) {
       const res = runSafetyGate(cwd);
       if (!res.passed) {
         for (const f of res.findings) {
-          console.error(`  [${f.category}] ${f.file}:${f.line} — ${f.detail}`);
+          reportCliError(`  [${f.category}] ${f.file}:${f.line} — ${f.detail}`);
         }
         process.exit(1);
       }
@@ -288,7 +293,7 @@ if (isDirectExecution(import.meta.url)) {
       const res = verifyTddLock(cwd);
       if (!res.passed) {
         for (const v of res.violations) {
-          console.error(`  - ${v}`);
+          reportCliError(`  - ${v}`);
         }
         process.exit(1);
       }
@@ -303,13 +308,14 @@ if (isDirectExecution(import.meta.url)) {
     case "diff": {
       const report = analyzeDiffAndTier(cwd, undefined, parseDiffArguments(process.argv.slice(3)));
       if (report.status !== "known") process.exitCode = 1;
+      for (const error of report.errors) reportCliError(error);
       console.log(`🎯 Recommended Tier: ${report.recommendedTier}`);
       console.log(`🚦 Decision: ${report.routingDecision}`);
       break;
     }
     case "install-hooks": {
       const res = installGitAndCiHooks(cwd);
-      if (res.conflicts.length > 0) { console.error("Preserved conflicting files: " + res.conflicts.join(", ")); process.exitCode = 1; }
+      if (res.conflicts.length > 0) { reportCliError("Preserved conflicting files: " + res.conflicts.join(", ")); process.exitCode = 1; }
       console.log(`🔒 Installed Zero-Bypass Hooks & CI Gates: ${res.installedPaths.join(", ")}`);
       break;
     }
@@ -318,5 +324,13 @@ if (isDirectExecution(import.meta.url)) {
       printHelp();
       break;
     }
+  }
+}
+
+if (isDirectExecution(import.meta.url)) {
+  try { runCli(); }
+  catch (error: unknown) {
+    reportCliError(error instanceof Error ? error.message : "CLI execution failed.");
+    process.exitCode = 1;
   }
 }

@@ -7,6 +7,7 @@ import { runDeslopEngine } from "./deslop.js";
 import { analyzeDiffAndTier } from "./diff-reviewer.js";
 import { detectProjectLanguages } from "./polyglot-engine.js";
 import { isDirectExecution } from "./runtime.js";
+import { redactedJson } from "./secret-redaction.js";
 
 export interface JsonRpcRequest {
   readonly jsonrpc: "2.0";
@@ -90,7 +91,7 @@ export function handleMcpRequest(req: JsonRpcRequest, rootDir: string = process.
     payload = { error: error instanceof Error ? error.message : "Tool execution failed." };
     isError = true;
   }
-  return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: JSON.stringify(payload, null, 2) }], isError } };
+  return { jsonrpc: "2.0", id, result: { content: [{ type: "text", text: redactedJson(payload) }], isError } };
 }
 
 export function startMcpStdioServer(rootDir: string = process.cwd()): void {

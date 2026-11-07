@@ -54,13 +54,18 @@
         "src/harness/runtime.ts",
         "src/harness/project-config.ts",
         "src/harness/source-analysis.ts",
-        "src/harness/module-resolver.ts"
+        "src/harness/module-resolver.ts",
+        "src/harness/module-references.ts",
+        "src/harness/native-source-parser.ts",
+        "src/harness/secret-redaction.ts",
+        "src/harness/text-decoder.ts"
       ],
       "contracts": [
         "src/core/contracts.ts"
       ],
       "tests": [
         "tests/harness-guardrails.spec.ts",
+        "tests/verification-inputs.spec.ts",
         "tests/audit-hardening.spec.ts",
         "tests/provenance-coverage.spec.ts",
         "tests/diff-paths.spec.ts",
@@ -86,6 +91,7 @@
       ],
       "tests": [
         "tests/multi-vendor.spec.ts",
+        "tests/verification-inputs.spec.ts",
         "tests/analysis-regressions.spec.ts",
         "tests/control-regressions.spec.ts",
         "tests/review-fixtures.contract.ts"
@@ -99,13 +105,15 @@
       "tier": "Tier 2",
       "riskReason": "Enforces Dune Linter, Deslop, Auto-Mapper, and SHA-256 TDD Locks across .ts, .tsx, .py, .go, and .php codebases.",
       "entrypoints": [
-        "src/harness/polyglot-engine.ts"
+        "src/harness/polyglot-engine.ts",
+        "src/harness/native-source-parser.ts"
       ],
       "contracts": [
         "src/core/contracts.ts"
       ],
       "tests": [
         "tests/polyglot-engine.spec.ts",
+        "tests/verification-inputs.spec.ts",
         "tests/audit-hardening.spec.ts",
         "tests/polyglot-contracts.spec.ts",
         "tests/analysis-regressions.spec.ts",

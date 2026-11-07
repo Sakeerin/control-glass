@@ -61,7 +61,7 @@ import {
   createNonEmptyText
 } from "control-glass";
 
-const claude = createVendorModelConfig("anthropic", "claude-3-7-sonnet-latest");
+const claude = createVendorModelConfig("anthropic", "claude-sonnet-4-6");
 const openai = createVendorModelConfig("openai", "gpt-4o");
 const gemini = createVendorModelConfig("gemini", "gemini-2.5-pro");
 const localOllama = createVendorModelConfig("openai-compatible", "deepseek-r1");
@@ -71,5 +71,7 @@ Check active vendor environment keys at any time via:
 ```bash
 npx control-glass vendors
 ```
+
+The Anthropic default is `claude-sonnet-4-6`. Both configuration creation and payload building reject the retired `claude-3-7-sonnet-latest` and `claude-3-7-sonnet-20250219` IDs with `RETIRED_VENDOR_MODEL` when targeting `api.anthropic.com`. Custom endpoints retain independent model selection because partner model lifecycles differ. This is an offline check of known retired IDs, not a network availability check. See [Anthropic model deprecations](https://platform.claude.com/docs/en/about-claude/model-deprecations).
 
 The LLM adapter builds provider-specific request payloads. HTTP transport, streaming, retries, and response processing belong to the caller. See [verification contract and migration](06-verification-contract.md) for MCP, lock approval, and consumer CI behavior.

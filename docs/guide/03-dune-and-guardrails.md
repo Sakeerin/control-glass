@@ -32,7 +32,7 @@ Why? Because in the *Mars Climate Orbiter* disaster, passing a raw `number` allo
 
 ## Phase 1 & 2 Guardrails (`npx control-glass tdd-check` & `safety`)
 
-* **Anti-Closed-Loop Testing (`tdd-guard.ts`)**: When an AI writes both code and tests simultaneously, it often weakens the test assertion to make buggy code pass. `npx control-glass lock --phase=spec-freeze` records SHA-256 hashes of `tests/*.spec.ts` and `src/core/contracts.ts`. During implementation, any unauthorized edit to those files triggers a `TDD_LOCK` failure.
+* **Anti-Closed-Loop Testing (`tdd-guard.ts`)**: `npx control-glass lock --phase=spec-freeze` freezes named tests/contracts, all helpers and fixtures in conventional test directories, and explicit `testLockFiles` inputs. During implementation, changes to these inputs fail the lock check. See the [verification contract](06-verification-contract.md#freeze-tests-explicitly) for inventory, binary hashing, and approval rules.
 * **Safety & Secret Gate (`safety-gate.ts`)**: Scans for leaked credentials (`sk-...`, `sk-proj-...`, `ghp_...`, `AKIA...`, private keys) and blocks destructive SQL/shell operations (`DROP TABLE`, `TRUNCATE TABLE`, `rm -rf`, `eval()`).
 
 ---

@@ -2,11 +2,12 @@ import { isDirectExecution } from "./runtime.js";
 import fs from "node:fs";
 import path from "node:path";
 import { collectSafetyFiles } from "./file-inventory.js";
+import { decodeProjectText } from "./text-decoder.js";
 
 export interface SafetyFinding {
   readonly file: string;
   readonly line: number;
-  readonly category: "SECRET_LEAK" | "DESTRUCTIVE_COMMAND" | "UNSAFE_EXECUTION";
+  readonly category: "SECRET_LEAK" | "DESTRUCTIVE_COMMAND" | "UNSAFE_EXECUTION" | "INVALID_TEXT_ENCODING";
   readonly detail: string;
 }
 
@@ -56,10 +57,13 @@ export function runSafetyGate(rootDir: string = process.cwd()): {
   for (const filePath of files) {
     const relativePath = path.relative(rootDir, filePath).split(path.sep).join("/");
     const bytes = fs.readFileSync(filePath);
-    if (bytes.includes(0)) continue;
+    let text: string | null;
+    try { text = decodeProjectText(bytes); }
+    catch { findings.push({ file: relativePath, line: 1, category: "INVALID_TEXT_ENCODING", detail: "Malformed text with a recognized encoding marker." }); scannedFiles++; continue; }
+    if (text === null) continue;
     scannedFiles++;
     const documentation = /\.(?:md|mdx|rst)$/i.test(relativePath);
-    const lines = bytes.toString("utf8").split(/\r?\n/);
+    const lines = text.split(/\r?\n/);
     lines.forEach((lineText, idx) => {
       for (const rule of SAFETY_PATTERNS) {
         if (documentation && rule.category !== "SECRET_LEAK") continue;

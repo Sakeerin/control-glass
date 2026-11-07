@@ -76,6 +76,7 @@ function readChangedFiles(rootDir: string, options: DiffOptions): { files: strin
     return { files: changedFiles, errors: working.errors, uiContext: { baseRef: mergeBase.value.trim(), headRef, workingFiles: working.files, changedFiles } };
   }
   if (useEnvironment && process.env["CI"] === "true") return { files: [], errors: ["CI_REQUIRES_EXPLICIT_BASE_REF"], uiContext: null };
+  if (options.headRef !== undefined || (useEnvironment && process.env["CONTROL_GLASS_HEAD_REF"] !== undefined)) return { files: [], errors: ["HEAD_REQUIRES_BASE_REF"], uiContext: null };
   const working = readWorkingFiles(rootDir);
   return { ...working, uiContext: working.errors.length > 0 ? null : { baseRef: "HEAD", workingFiles: working.files, changedFiles: working.files } };
 }

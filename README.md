@@ -42,7 +42,7 @@ npx control-glass init --lang all      # สร้างครบทุกภา
 2. **🔌 Universal MCP Server (`npx control-glass mcp`):**
    * เปิดเครื่องมือตรวจครบ 7 ด่านผ่าน `control_glass_verify_gates` โดยใช้ pipeline เดียวกับ CLI พร้อมเครื่องมือ dependency map, deslop, diff, benchmark และตรวจภาษา ส่วนการเปลี่ยน test lock ต้องทำผ่าน CLI ใน Phase 1 อย่างชัดเจน
 3. **🤖 Multi-Vendor LLM Gateway (`src/vendors/llm-gateway.ts`):**
-   * โมดูล Type-safe สำหรับสร้าง request payload ของ **Anthropic (`claude-3-7-sonnet`), OpenAI (`gpt-4o`), Google (`gemini-2.5-pro`), และ OpenAI-Compatible (`Ollama / DeepSeek / OpenRouter`)** เพื่อใช้ทำ Multi-Model `/arena` หรือ Cross-Vendor `/interrogate`
+   * โมดูล Type-safe สำหรับสร้าง request payload ของ **Anthropic (`claude-sonnet-4-6`), OpenAI (`gpt-4o`), Google (`gemini-2.5-pro`), และ OpenAI-Compatible (`Ollama / DeepSeek / OpenRouter`)** เพื่อใช้ทำ Multi-Model `/arena` หรือ Cross-Vendor `/interrogate`
 
 ---
 
